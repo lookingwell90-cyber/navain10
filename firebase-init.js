@@ -1,8 +1,8 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getAuth } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDteptTOhJ1gjmNOrrnrIfepe2neg6hmkU",
   authDomain: "my-leads-app-f6198.firebaseapp.com",
   projectId: "my-leads-app-f6198",
@@ -14,7 +14,3 @@ const firebaseConfig = {
 export const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-
-export const authReady = signInAnonymously(auth).catch(err => {
-  console.error("Firebase auth error:", err);
-});
