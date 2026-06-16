@@ -745,6 +745,8 @@ window.clearLeads = async function() {
   showToast('All leads cleared');
 };
 
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 function showAlert(msg, type) {
   const el = document.getElementById('upload-alert');
   el.innerHTML = msg ? `<div class="alert alert-${type}">${msg}</div>` : '';
