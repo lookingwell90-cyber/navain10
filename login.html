@@ -250,9 +250,10 @@
         formTitle.textContent = "Sign In to Your Portal";
       }
     } catch (err) {
-      console.error(err);
-      showToast("Error checking database initialization");
-      loadingState.textContent = "Connection error. Please refresh the page.";
+      console.warn("Database initialization check skipped (likely due to security rules):", err);
+      loadingState.classList.add('hidden');
+      loginFormContainer.classList.remove('hidden');
+      formTitle.textContent = "Sign In to Your Portal";
     }
   }
 
