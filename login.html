@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navain AI — Login</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-hint: #94a3b8;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.15);
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --accent-text: #1d4ed8;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f19;
+      --bg-secondary: #161f30;
+      --bg-tertiary: #0f1322;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-hint: #64748b;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --accent: #3b82f6;
+      --accent-bg: rgba(59, 130, 246, 0.1);
+      --accent-text: #60a5fa;
+    }
+  }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg-tertiary);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    transition: var(--transition);
+  }
+  .container {
+    width: 100%;
+    max-width: 440px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    padding: 40px 32px;
+    transition: var(--transition);
+  }
+  .logo {
+    font-family: 'Outfit', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.03em;
+    text-align: center;
+    margin-bottom: 8px;
+  }
+  .logo span { color: var(--accent); }
+  
+  .title {
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    text-align: center;
+    margin-bottom: 24px;
+    color: var(--text-muted);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .form-group input {
+    padding: 12px 14px;
+    font-size: 14px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: var(--transition);
+  }
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+
+  .btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 600;
+    border-radius: var(--radius);
+    border: 1px solid var(--border-strong);
+    background: var(--bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: var(--transition);
+    box-shadow: var(--shadow-sm);
+    margin-top: 12px;
+  }
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    opacity: 0.95;
+    background: var(--accent);
+    transform: translateY(-1px);
+  }
+  
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 12px 24px;
+    border-radius: 30px;
+    font-size: 13.5px;
+    font-weight: 600;
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    z-index: 999;
+    white-space: nowrap;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  .setup-alert {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    border: 1px solid rgba(37, 99, 235, 0.15);
+    padding: 12px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    line-height: 1.4;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="logo">Navain <span>AI</span></div>
+  <div class="title" id="form-title">Lead Tracker Portal</div>
+
+  <!-- Loading State -->
+  <div id="loading-state" style="text-align: center; padding: 20px 0; color: var(--text-hint);">
+    Loading authentication configurations...
+  </div>
+
+  <!-- Bootstrap Setup Form -->
+  <div id="setup-form-container" class="hidden">
+    <div class="setup-alert">
+      <strong>Initial Setup Required</strong><br>
+      No admin users found in the database. Please create the initial administrator account below.
+    </div>
+    <form id="setup-form" onsubmit="createAdminAccount(event)">
+      <div class="form-group">
+        <label for="setup-name">Administrator Name</label>
+        <input type="text" id="setup-name" required placeholder="e.g. Admin Manager">
+      </div>
+      <div class="form-group">
+        <label for="setup-email">Admin Email Address</label>
+        <input type="email" id="setup-email" required placeholder="admin@navain.com">
+      </div>
+      <div class="form-group">
+        <label for="setup-password">Admin Password (min. 6 chars)</label>
+        <input type="password" id="setup-password" required minlength="6" placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary">Create Admin & Login</button>
+    </form>
+  </div>
+
+  <!-- Regular Login Form -->
+  <div id="login-form-container" class="hidden">
+    <form id="login-form" onsubmit="loginUser(event)">
+      <div class="form-group">
+        <label for="login-email">Email Address</label>
+        <input type="email" id="login-email" required placeholder="you@navain.com">
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <input type="password" id="login-password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary">Sign In</button>
+    </form>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+  import { db, auth } from './firebase-init.js';
+  import { collection, query, limit, getDocs, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+  import { signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+  const loadingState = document.getElementById('loading-state');
+  const setupFormContainer = document.getElementById('setup-form-container');
+  const loginFormContainer = document.getElementById('login-form-container');
+  const formTitle = document.getElementById('form-title');
+
+  // Check if system has any registered users (if not, bootstrapping admin accounts)
+  async function checkInitialSetup() {
+    try {
+      const qUsers = query(collection(db, 'users'), limit(1));
+      const snap = await getDocs(qUsers);
+      
+      loadingState.classList.add('hidden');
+      if (snap.empty) {
+        setupFormContainer.classList.remove('hidden');
+        formTitle.textContent = "Admin Account Setup";
+      } else {
+        loginFormContainer.classList.remove('hidden');
+        formTitle.textContent = "Sign In to Your Portal";
+      }
+    } catch (err) {
+      console.error(err);
+      showToast("Error checking database initialization");
+      loadingState.textContent = "Connection error. Please refresh the page.";
+    }
+  }
+
+  // Create primary admin account
+  window.createAdminAccount = async function(e) {
+    e.preventDefault();
+    const name = document.getElementById('setup-name').value.trim();
+    const email = document.getElementById('setup-email').value.trim();
+    const password = document.getElementById('setup-password').value;
+
+    if (!name || !email || !password) return;
+
+    try {
+      showToast("Creating administrator account...");
+      
+      // Register credential in Auth
+      const credential = await createUserWithEmailAndPassword(auth, email, password);
+      const uid = credential.user.uid;
+
+      // Write admin properties to users collection
+      await setDoc(doc(db, 'users', uid), {
+        uid: uid,
+        name: name,
+        email: email,
+        role: 'admin',
+        createdAt: new Date().toISOString()
+      });
+
+      // Cache details
+      localStorage.setItem('user_role', 'admin');
+      localStorage.setItem('user_name', name);
+      localStorage.setItem('user_email', email);
+
+      showToast("✓ Setup complete! Redirecting...");
+      setTimeout(() => {
+        window.location.href = 'admin.html';
+      }, 1000);
+
+    } catch (err) {
+      console.error(err);
+      showToast("Error creating account: " + err.message);
+    }
+  }
+
+  // Standard Login Function
+  window.loginUser = async function(e) {
+    e.preventDefault();
+    const email = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+
+    if (!email || !password) return;
+
+    try {
+      showToast("Verifying credentials...");
+      const credential = await signInWithEmailAndPassword(auth, email, password);
+      const uid = credential.user.uid;
+
+      // Fetch user profile from firestore
+      const userDocRef = doc(db, 'users', uid);
+      const userDocSnap = await getDoc(userDocRef);
+
+      if (!userDocSnap.exists()) {
+        showToast("Error: Profile not found in database.");
+        await signOut(auth);
+        return;
+      }
+
+      const userData = userDocSnap.data();
+      localStorage.setItem('user_role', userData.role);
+      localStorage.setItem('user_name', userData.name || 'User');
+      localStorage.setItem('user_email', userData.email);
+
+      showToast("✓ Login successful! Redirecting...");
+      setTimeout(() => {
+        if (userData.role === 'admin') {
+          window.location.href = 'admin.html';
+        } else {
+          window.location.href = 'index.html';
+        }
+      }, 1000);
+    } catch (err) {
+      console.error(err);
+      showToast("Authentication failed: " + err.message);
+    }
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // Trigger init check
+  checkInitialSetup();
+</script>
+</body>
+</html>
