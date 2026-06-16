@@ -313,7 +313,7 @@
     <div class="card-title">Database Status</div>
     <div class="current-leads-info">
       <p id="current-count">Loading status...</p>
-      <button class="btn btn-danger" onclick="clearLeads()">
+      <button class="btn btn-danger" id="clear-leads-btn" onclick="clearLeads()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
         Clear all leads
       </button>
@@ -366,7 +366,7 @@
       <small>Accepts any standard comma-separated file</small>
     </div>
     <input type="file" id="file-input" accept=".csv" onchange="handleFile(this.files[0])">
-    <div class="form-group" style="margin-top: 16px; margin-bottom: 8px; max-width: 320px;">
+    <div class="form-group" id="csv-assignee-group" style="margin-top: 16px; margin-bottom: 8px; max-width: 320px;">
       <label for="csv-assignee" style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Assign Uploaded Leads To:</label>
       <select id="csv-assignee" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 13.5px; outline: none; cursor: pointer; margin-top: 6px;">
         <option value="">— Leave Unassigned —</option>
@@ -467,22 +467,34 @@ async function showCurrentCount() {
 let currentUser = null;
 let employees = [];
 
+let userRole = null;
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = 'login.html';
     return;
   }
-  const role = localStorage.getItem('user_role');
-  if (role !== 'admin') {
-    window.location.href = 'index.html';
+  userRole = localStorage.getItem('user_role');
+  if (userRole !== 'admin' && userRole !== 'employee') {
+    window.location.href = 'login.html';
     return;
   }
   currentUser = user;
-  const userName = localStorage.getItem('user_name') || 'Admin';
-  document.getElementById('user-display').textContent = userName + " (Admin)";
+  const userName = localStorage.getItem('user_name') || 'User';
+  document.getElementById('user-display').textContent = userName + ` (${userRole === 'admin' ? 'Admin' : 'Agent'})`;
+
+  if (userRole === 'admin') {
+    document.getElementById('employee-manager-card').classList.remove('hidden');
+    document.getElementById('clear-leads-btn').classList.remove('hidden');
+    document.getElementById('csv-assignee-group').classList.remove('hidden');
+    await loadEmployees();
+  } else {
+    document.getElementById('employee-manager-card').classList.add('hidden');
+    document.getElementById('clear-leads-btn').classList.add('hidden');
+    document.getElementById('csv-assignee-group').classList.add('hidden');
+  }
   
   await showCurrentCount();
-  await loadEmployees();
 });
 
 window.logout = async () => {
@@ -703,9 +715,17 @@ window.publishLeads = async function() {
   try {
     showToast('Publishing…');
     
-    const assignedTo = document.getElementById('csv-assignee').value;
-    const emp = employees.find(e => e.uid === assignedTo);
-    const assignedName = emp ? emp.name : '';
+    let assignedTo = '';
+    let assignedName = '';
+
+    if (userRole === 'admin') {
+      assignedTo = document.getElementById('csv-assignee').value;
+      const emp = employees.find(e => e.uid === assignedTo);
+      assignedName = emp ? emp.name : '';
+    } else {
+      assignedTo = currentUser ? currentUser.uid : '';
+      assignedName = localStorage.getItem('user_name') || '';
+    }
 
     // Write new leads in batches of 500
     let count = 0;
