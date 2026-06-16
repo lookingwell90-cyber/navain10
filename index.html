@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navain AI — Lead Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff; 
+    --bg-secondary: #f8fafc; 
+    --bg-tertiary: #f1f5f9;
+    --text: #0f172a; 
+    --text-muted: #475569; 
+    --text-hint: #94a3b8;
+    --border: rgba(15, 23, 42, 0.08); 
+    --border-strong: rgba(15, 23, 42, 0.15);
+    --accent: #2563eb; 
+    --accent-bg: #eff6ff; 
+    --accent-text: #1d4ed8;
+    --radius: 10px; 
+    --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --s-not-called-bg: #f1f5f9; --s-not-called-text: #475569;
+    --s-no-answer-bg: #fef3c7; --s-no-answer-text: #92400e;
+    --s-voicemail-bg: #e0e7ff; --s-voicemail-text: #3730a3;
+    --s-interested-bg: #dcfce7; --s-interested-text: #166534;
+    --s-not-interested-bg: #fee2e2; --s-not-interested-text: #991b1b;
+    --s-callback-bg: #eff6ff; --s-callback-text: #1e40af;
+    --s-wrong-bg: #fce7f3; --s-wrong-text: #9d174d;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f19; 
+      --bg-secondary: #161f30; 
+      --bg-tertiary: #0f1322;
+      --text: #f8fafc; 
+      --text-muted: #94a3b8; 
+      --text-hint: #64748b;
+      --border: rgba(255, 255, 255, 0.06); 
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --accent: #3b82f6; 
+      --accent-bg: rgba(59, 130, 246, 0.1); 
+      --accent-text: #60a5fa;
+      
+      --s-not-called-bg: #1e293b; --s-not-called-text: #cbd5e1;
+      --s-no-answer-bg: rgba(217, 119, 6, 0.15); --s-no-answer-text: #fbbf24;
+      --s-voicemail-bg: rgba(79, 70, 229, 0.15); --s-voicemail-text: #a5b4fc;
+      --s-interested-bg: rgba(22, 163, 74, 0.15); --s-interested-text: #86efac;
+      --s-not-interested-bg: rgba(220, 38, 38, 0.15); --s-not-interested-text: #fca5a5;
+      --s-callback-bg: rgba(37, 99, 235, 0.15); --s-callback-text: #93c5fd;
+      --s-wrong-bg: rgba(219, 39, 119, 0.15); --s-wrong-text: #fbcfe8;
+    }
+  }
+  body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+    background: var(--bg-tertiary); 
+    color: var(--text); 
+    min-height: 100vh; 
+    transition: var(--transition);
+  }
+  header { 
+    background: rgba(255, 255, 255, 0.75); 
+    backdrop-filter: blur(12px); 
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); 
+    padding: 0 24px; 
+    height: 64px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    position: sticky; 
+    top: 0; 
+    z-index: 100; 
+  }
+  @media (prefers-color-scheme: dark) {
+    header {
+      background: rgba(11, 15, 25, 0.75);
+    }
+  }
+  .logo { 
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px; 
+    font-weight: 700; 
+    color: var(--text); 
+    letter-spacing: -0.03em; 
+    display: flex; 
+    align-items: center; 
+    gap: 10px; 
+  }
+  .logo span { color: var(--accent); }
+  
+  .live-dot { 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 6px; 
+    font-size: 11px; 
+    font-weight: 600; 
+    color: var(--text-hint); 
+    padding: 4px 10px; 
+    border-radius: 20px; 
+    background: var(--bg-secondary); 
+    border: 1px solid var(--border); 
+  }
+  .live-dot::before { 
+    content: ''; 
+    width: 6px; 
+    height: 6px; 
+    border-radius: 50%; 
+    background: var(--text-hint); 
+    animation: pulse 2s infinite;
+  }
+  .live-dot.connected { 
+    color: var(--s-interested-text); 
+    background: var(--s-interested-bg); 
+    border-color: transparent; 
+  }
+  .live-dot.connected::before { background: var(--s-interested-text); }
+  
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+  
+  .btn { 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 6px; 
+    padding: 8px 16px; 
+    font-size: 13px; 
+    font-weight: 600; 
+    border-radius: var(--radius); 
+    border: 1px solid var(--border-strong); 
+    background: var(--bg); 
+    color: var(--text); 
+    cursor: pointer; 
+    transition: var(--transition); 
+    white-space: nowrap; 
+    text-decoration: none; 
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:hover { 
+    background: var(--bg-secondary); 
+    box-shadow: var(--shadow-md);
+  }
+  .btn-accent { 
+    background: var(--accent); 
+    border-color: var(--accent); 
+    color: #fff; 
+  }
+  .btn-accent:hover { 
+    opacity: 0.95; 
+    background: var(--accent); 
+    transform: translateY(-1px);
+  }
+  .btn-secondary-action {
+    background: var(--accent-bg);
+    color: var(--accent-text);
+    border-color: transparent;
+  }
+  .btn-secondary-action:hover {
+    filter: brightness(0.95);
+  }
+  .btn-danger-icon {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-hint);
+    padding: 6px;
+    border-radius: 50%;
+    transition: var(--transition);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .btn-danger-icon:hover {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+  }
+  
+  main { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; }
+  
+  /* Stats Dashboard Grid */
+  .stats-grid { 
+    display: grid; 
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); 
+    gap: 16px; 
+    margin-bottom: 24px; 
+  }
+  .stat-card { 
+    background: var(--bg); 
+    border: 1px solid var(--border); 
+    border-radius: var(--radius-lg); 
+    padding: 20px; 
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+  }
+  .stat-card:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+  }
+  .stat-header { 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    margin-bottom: 10px;
+  }
+  .stat-title { 
+    font-size: 13px; 
+    font-weight: 600; 
+    color: var(--text-muted); 
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .stat-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+  }
+  .stat-icon-wrapper.blue { background: rgba(37, 99, 235, 0.1); color: #2563eb; }
+  .stat-icon-wrapper.purple { background: rgba(79, 70, 229, 0.1); color: #4f46e5; }
+  .stat-icon-wrapper.green { background: rgba(22, 163, 74, 0.1); color: #16a34a; }
+  .stat-icon-wrapper.orange { background: rgba(217, 119, 6, 0.1); color: #d97706; }
+  
+  .stat-value { 
+    font-family: 'Outfit', sans-serif;
+    font-size: 26px; 
+    font-weight: 700; 
+    margin-bottom: 4px;
+    color: var(--text);
+  }
+  .stat-label { font-size: 12px; color: var(--text-hint); }
+  
+  .pills { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 24px; }
+  .pill { 
+    display: inline-flex; 
+    align-items: center; 
+    gap: 6px; 
+    padding: 6px 14px; 
+    border-radius: 30px; 
+    font-size: 12.5px; 
+    font-weight: 600; 
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+  .pill-count { 
+    font-weight: 700; 
+    background: rgba(0,0,0,0.05);
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+  @media (prefers-color-scheme: dark) {
+    .pill-count { background: rgba(255,255,255,0.08); }
+  }
+  
+  .controls { 
+    display: flex; 
+    gap: 12px; 
+    margin-bottom: 20px; 
+    flex-wrap: wrap; 
+    align-items: center; 
+  }
+  .search-wrapper {
+    position: relative;
+    flex: 1;
+    min-width: 220px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-hint);
+    pointer-events: none;
+  }
+  .controls input[type="text"] { 
+    width: 100%;
+    padding: 10px 14px 10px 36px; 
+    font-size: 13.5px; 
+    border: 1px solid var(--border-strong); 
+    border-radius: var(--radius); 
+    background: var(--bg); 
+    color: var(--text); 
+    outline: none;
+    transition: var(--transition);
+  }
+  .controls input[type="text"]:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .controls input::placeholder { color: var(--text-hint); }
+  
+  .controls select { 
+    padding: 10px 14px; 
+    font-size: 13px; 
+    font-weight: 500;
+    border: 1px solid var(--border-strong); 
+    border-radius: var(--radius); 
+    background: var(--bg); 
+    color: var(--text); 
+    cursor: pointer; 
+    outline: none;
+    transition: var(--transition);
+  }
+  .controls select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  
+  .table-wrap { 
+    background: var(--bg); 
+    border: 1px solid var(--border); 
+    border-radius: var(--radius-lg); 
+    overflow: hidden; 
+    overflow-x: auto; 
+    box-shadow: var(--shadow-md);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 900px; text-align: left; }
+  th { background: var(--bg-secondary); padding: 12px 16px; text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg-secondary); }
+  
+  .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap; }
+  
+  .status-select { 
+    padding: 6px 12px; 
+    font-size: 12px; 
+    font-weight: 600;
+    border-radius: var(--radius); 
+    border: 1px solid transparent; 
+    background: var(--bg); 
+    color: var(--text); 
+    cursor: pointer; 
+    max-width: 160px; 
+    outline: none;
+    box-shadow: var(--shadow-sm);
+    transition: var(--transition);
+  }
+  .status-select:focus {
+    border-color: var(--border-strong);
+  }
+  
+  .note-input { 
+    padding: 6px 10px; 
+    font-size: 12px; 
+    border-radius: var(--radius); 
+    border: 1px solid var(--border); 
+    background: var(--bg-secondary); 
+    color: var(--text); 
+    width: 100%; 
+    min-width: 120px; 
+    max-width: 220px; 
+    outline: none;
+    transition: var(--transition);
+  }
+  .note-input:focus { 
+    border-color: var(--accent); 
+    background: var(--bg); 
+  }
+  .updated-at { font-size: 11px; color: var(--text-hint); white-space: nowrap; }
+  
+  .empty-state { text-align: center; padding: 64px 24px; color: var(--text-muted); }
+  .empty-state h2 { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+  .empty-state p { font-size: 14px; margin-bottom: 24px; }
+  
+  .toast { 
+    position: fixed; 
+    bottom: 24px; 
+    left: 50%; 
+    transform: translateX(-50%) translateY(80px); 
+    background: var(--text); 
+    color: var(--bg); 
+    padding: 12px 24px; 
+    border-radius: 30px; 
+    font-size: 13.5px; 
+    font-weight: 600; 
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    z-index: 999; 
+    white-space: nowrap; 
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .result-count { font-size: 12.5px; font-weight: 500; color: var(--text-hint); margin-bottom: 12px; }
+  
+  /* Mobile Responsive Cards */
+  #mobile-leads-list {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mobile-lead-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+  }
+  .mobile-card-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .mobile-card-row:last-child {
+    margin-bottom: 0;
+    margin-top: 12px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .mobile-business-name {
+    font-family: 'Outfit', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .mobile-contact-name {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+  .mobile-meta {
+    font-size: 12px;
+    color: var(--text-hint);
+  }
+  
+  /* Custom Modal Popups */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .modal-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .modal-content {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    width: 90%;
+    max-width: 580px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: var(--shadow-lg);
+    padding: 24px;
+    transform: translateY(20px);
+    transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.175);
+  }
+  .modal-overlay.show .modal-content {
+    transform: translateY(0);
+  }
+  .modal-sm {
+    max-width: 400px;
+  }
+  .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 12px;
+  }
+  .modal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'Outfit', sans-serif;
+  }
+  .modal-close {
+    background: transparent;
+    border: none;
+    font-size: 24px;
+    color: var(--text-muted);
+    cursor: pointer;
+    line-height: 1;
+  }
+  .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  @media (max-width: 600px) {
+    .form-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .form-group label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .form-group input {
+    padding: 10px 12px;
+    font-size: 13.5px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: var(--transition);
+  }
+  .form-group input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  .modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 24px;
+    border-top: 1px solid var(--border);
+    padding-top: 16px;
+  }
+  .text-danger-note {
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-top: 8px;
+  }
+  .btn-danger-action {
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-color: transparent;
+  }
+  .btn-danger-action:hover {
+    filter: brightness(0.95);
+  }
+  
+  @keyframes pulse {
+    0% { opacity: 0.6; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.1); }
+    100% { opacity: 0.6; transform: scale(1); }
+  }
+  
+  @media (max-width: 768px) {
+    .header-actions .btn-label { display: none; } 
+    main { padding: 20px 16px 60px; }
+    .table-wrap { display: none; }
+    #mobile-leads-list { display: flex; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    Navain <span>AI</span> — Lead tracker
+    <span class="live-dot" id="live-dot"><span class="live-label">Connecting…</span></span>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-secondary-action" onclick="openAddLeadModal()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span class="btn-label">Add Lead</span>
+    </button>
+    <button class="btn" onclick="exportCSV()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="btn-label">Export CSV</span>
+    </button>
+    <a class="btn btn-accent" href="admin.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <span class="btn-label">Admin portal</span>
+    </a>
+  </div>
+</header>
+
+<main>
+  <!-- Stats Dashboard Grid -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-title">Total Leads</span>
+        <div class="stat-icon-wrapper blue">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+      </div>
+      <div class="stat-value" id="stat-total">0</div>
+      <div class="stat-label">Leads active in database</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-title">Called Rate</span>
+        <div class="stat-icon-wrapper purple">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+        </div>
+      </div>
+      <div class="stat-value" id="stat-called-rate">0%</div>
+      <div class="stat-label" id="stat-called-count">0 of 0 leads called</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-title">Interested Leads</span>
+        <div class="stat-icon-wrapper green">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        </div>
+      </div>
+      <div class="stat-value" id="stat-interested">0</div>
+      <div class="stat-label">Positive customer responses</div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-header">
+        <span class="stat-title">Callbacks Scheduled</span>
+        <div class="stat-icon-wrapper orange">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+      </div>
+      <div class="stat-value" id="stat-callback">0</div>
+      <div class="stat-label">Requires follow-up calls</div>
+    </div>
+  </div>
+
+  <div class="pills" id="pills"></div>
+  <div class="controls">
+    <div class="search-wrapper">
+      <svg class="search-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="search" placeholder="Search by name, business, contact..." oninput="renderTable()">
+    </div>
+    <select id="filter-status" onchange="renderTable()">
+      <option value="">All Statuses</option>
+      <option>Not Called</option><option>No Answer</option><option>Voicemail</option>
+      <option>Interested</option><option>Not Interested</option>
+      <option>Callback Scheduled</option><option>Wrong Number</option>
+    </select>
+    <select id="filter-city" onchange="renderTable()"><option value="">All Cities</option></select>
+    <select id="filter-province" onchange="renderTable()"><option value="">All Provinces</option></select>
+    <select id="sort-by" onchange="renderTable()">
+      <option value="newest">Sort by: Newest Added</option>
+      <option value="oldest">Sort by: Oldest Added</option>
+      <option value="name">Sort by: Business (A-Z)</option>
+      <option value="status">Sort by: Status</option>
+    </select>
+  </div>
+  
+  <p class="result-count" id="result-count"></p>
+  
+  <div class="table-wrap" id="table-wrap">
+    <div class="empty-state" id="empty-state">
+      <h2>No leads uploaded yet</h2>
+      <p>Ask your admin to upload a CSV file or add a lead manually to get started.</p>
+      <button class="btn btn-accent" onclick="openAddLeadModal()">Add Manual Lead</button>
+    </div>
+    <table id="leads-table" style="display:none;">
+      <thead>
+        <tr>
+          <th>#</th><th>Business</th><th>Contact</th><th>Phone</th>
+          <th>City</th><th>Province</th><th>Industry</th>
+          <th>Status</th><th>Note</th><th>Updated</th><th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+  
+  <!-- Mobile Card List View -->
+  <div id="mobile-leads-list"></div>
+</main>
+
+<!-- Add Lead Modal -->
+<div id="add-lead-modal" class="modal-overlay" onclick="if(event.target===this) closeAddLeadModal()">
+  <div class="modal-content">
+    <div class="modal-header">
+      <h2>Add New Lead</h2>
+      <button class="modal-close" onclick="closeAddLeadModal()">&times;</button>
+    </div>
+    <form id="add-lead-form" onsubmit="saveLead(event)">
+      <div class="form-grid">
+        <div class="form-group">
+          <label for="lead-business">Business Name*</label>
+          <input type="text" id="lead-business" required placeholder="e.g. Acme Corp">
+        </div>
+        <div class="form-group">
+          <label for="lead-contact">Contact Name</label>
+          <input type="text" id="lead-contact" placeholder="e.g. John Doe">
+        </div>
+        <div class="form-group">
+          <label for="lead-phone">Phone Number*</label>
+          <input type="tel" id="lead-phone" required placeholder="e.g. +1 555-0199">
+        </div>
+        <div class="form-group">
+          <label for="lead-email">Email Address</label>
+          <input type="email" id="lead-email" placeholder="e.g. contact@acme.com">
+        </div>
+        <div class="form-group">
+          <label for="lead-city">City</label>
+          <input type="text" id="lead-city" placeholder="e.g. Toronto">
+        </div>
+        <div class="form-group">
+          <label for="lead-province">Province</label>
+          <input type="text" id="lead-province" placeholder="e.g. ON">
+        </div>
+        <div class="form-group">
+          <label for="lead-industry">Industry</label>
+          <input type="text" id="lead-industry" placeholder="e.g. Tech Services">
+        </div>
+        <div class="form-group">
+          <label for="lead-website">Website</label>
+          <input type="url" id="lead-website" placeholder="e.g. https://acme.com">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn" onclick="closeAddLeadModal()">Cancel</button>
+        <button type="submit" class="btn btn-accent">Save Lead</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Custom Delete Confirm Modal -->
+<div id="delete-confirm-modal" class="modal-overlay" onclick="if(event.target===this) closeDeleteModal()">
+  <div class="modal-content modal-sm">
+    <div class="modal-header">
+      <h2>Delete Lead</h2>
+      <button class="modal-close" onclick="closeDeleteModal()">&times;</button>
+    </div>
+    <div style="font-size:14px;color:var(--text);margin-bottom:12px;line-height:1.5;">
+      Are you sure you want to delete <strong id="delete-lead-name"></strong> from the tracker?
+      <p class="text-danger-note">⚠️ This operation is permanent and cannot be undone.</p>
+    </div>
+    <div class="modal-footer" style="margin-top:16px;">
+      <button class="btn" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger-action" id="confirm-delete-btn">Delete Lead</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { db, authReady } from './firebase-init.js';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+const STATUSES = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
+const STATUS_COLORS = {
+  'Not Called':          { bg: 'var(--s-not-called-bg)',      text: 'var(--s-not-called-text)' },
+  'No Answer':           { bg: 'var(--s-no-answer-bg)',       text: 'var(--s-no-answer-text)' },
+  'Voicemail':           { bg: 'var(--s-voicemail-bg)',       text: 'var(--s-voicemail-text)' },
+  'Interested':          { bg: 'var(--s-interested-bg)',      text: 'var(--s-interested-text)' },
+  'Not Interested':      { bg: 'var(--s-not-interested-bg)',  text: 'var(--s-not-interested-text)' },
+  'Callback Scheduled':  { bg: 'var(--s-callback-bg)',        text: 'var(--s-callback-text)' },
+  'Wrong Number':        { bg: 'var(--s-wrong-bg)',           text: 'var(--s-wrong-text)' },
+};
+
+let leads = [];
+const noteTimers = {};
+const liveDot = document.getElementById('live-dot');
+let leadToDeleteId = null;
+
+// Helper: get value from lead regardless of field name format
+function f(lead, key) {
+  const aliases = {
+    businessName:  ['businessName', 'Business Name', 'business_name', 'company'],
+    contactName:   ['contactName',  'Contact Name',  'contact_name',  'name'],
+    phone:         ['phone',        'Phone',         'contact_mobile_phone'],
+    email:         ['email',        'Email'],
+    city:          ['city',         'City',          'profile_city'],
+    province:      ['province',     'Province'],
+    industry:      ['industry',     'Industry',      'prospect_job_title'],
+    website:       ['website',      'Website',       'prospect_company_website'],
+    linkedin:      ['linkedin',     'LinkedIn',      'prospect_linkedin'],
+    jobTitle:      ['jobTitle',     'Job Title',     'prospect_job_title'],
+  };
+  const keys = aliases[key] || [key];
+  for (const k of keys) { if (lead[k] !== undefined && lead[k] !== '') return lead[k]; }
+  return '';
+}
+
+window.exportCSV = exportCSV;
+window.renderTable = renderTable;
+window.updateStatus = updateStatus;
+window.updateNote = updateNote;
+
+// Modals functions
+window.openAddLeadModal = () => {
+  document.getElementById('add-lead-form').reset();
+  document.getElementById('add-lead-modal').classList.add('show');
+};
+window.closeAddLeadModal = () => {
+  document.getElementById('add-lead-modal').classList.remove('show');
+};
+window.saveLead = async (e) => {
+  e.preventDefault();
+  const business = document.getElementById('lead-business').value.trim();
+  const contact = document.getElementById('lead-contact').value.trim();
+  const phone = document.getElementById('lead-phone').value.trim();
+  const email = document.getElementById('lead-email').value.trim();
+  const city = document.getElementById('lead-city').value.trim();
+  const province = document.getElementById('lead-province').value.trim();
+  const industry = document.getElementById('lead-industry').value.trim();
+  const website = document.getElementById('lead-website').value.trim();
+
+  if (!business || !phone) {
+    showToast('Business Name and Phone are required.');
+    return;
+  }
+
+  try {
+    showToast('Saving lead...');
+    await addDoc(collection(db, 'leads'), {
+      businessName: business,
+      contactName: contact,
+      phone: phone,
+      email: email,
+      city: city,
+      province: province,
+      industry: industry,
+      website: website,
+      _status: 'Not Called',
+      _note: '',
+      _createdAt: new Date().toISOString(),
+      _updatedAt: serverTimestamp()
+    });
+    closeAddLeadModal();
+    showToast('✓ Lead saved successfully');
+  } catch (err) {
+    console.error(err);
+    showToast('Error saving lead');
+  }
+};
+
+window.openDeleteModal = (id, name) => {
+  leadToDeleteId = id;
+  document.getElementById('delete-lead-name').textContent = name || 'this lead';
+  document.getElementById('delete-confirm-modal').classList.add('show');
+};
+window.closeDeleteModal = () => {
+  document.getElementById('delete-confirm-modal').classList.remove('show');
+  leadToDeleteId = null;
+};
+document.getElementById('confirm-delete-btn').onclick = async () => {
+  if (!leadToDeleteId) return;
+  try {
+    showToast('Deleting lead...');
+    await deleteDoc(doc(db, 'leads', leadToDeleteId));
+    closeDeleteModal();
+    showToast('✓ Lead deleted');
+  } catch (err) {
+    console.error(err);
+    showToast('Error deleting lead');
+  }
+};
+
+await authReady;
+
+onSnapshot(query(collection(db, 'leads')), snap => {
+  leads = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  
+  liveDot.classList.add('connected');
+  liveDot.innerHTML = '<span class="live-label">Live</span>';
+  
+  updateDashboardStats();
+  populateFilters();
+  renderPills();
+  renderTable();
+}, err => {
+  console.error('Firestore error:', err);
+  liveDot.classList.remove('connected');
+  liveDot.innerHTML = '<span class="live-label">Offline</span>';
+});
+
+function updateDashboardStats() {
+  const total = leads.length;
+  const called = leads.filter(l => l._status && l._status !== 'Not Called').length;
+  const calledRate = total > 0 ? Math.round((called / total) * 100) : 0;
+  const interested = leads.filter(l => l._status === 'Interested').length;
+  const callbacks = leads.filter(l => l._status === 'Callback Scheduled').length;
+  
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-called-rate').textContent = calledRate + '%';
+  document.getElementById('stat-called-count').textContent = called + ' of ' + total + ' leads called';
+  document.getElementById('stat-interested').textContent = interested;
+  document.getElementById('stat-callback').textContent = callbacks;
+}
+
+function populateFilters() {
+  const cities = [...new Set(leads.map(l => f(l,'city')).filter(Boolean))].sort();
+  const provinces = [...new Set(leads.map(l => f(l,'province')).filter(Boolean))].sort();
+  const cityEl = document.getElementById('filter-city');
+  const provEl = document.getElementById('filter-province');
+  const sc = cityEl.value, sp = provEl.value;
+  cityEl.innerHTML = '<option value="">All Cities</option>' + cities.map(c => '<option>' + esc(c) + '</option>').join('');
+  provEl.innerHTML = '<option value="">All Provinces</option>' + provinces.map(p => '<option>' + esc(p) + '</option>').join('');
+  cityEl.value = sc; provEl.value = sp;
+}
+
+function renderPills() {
+  const pills = document.getElementById('pills');
+  if (!leads.length) { pills.innerHTML = ''; return; }
+  const counts = {};
+  STATUSES.forEach(s => counts[s] = 0);
+  leads.forEach(l => { if (counts[l._status] !== undefined) counts[l._status]++; });
+  pills.innerHTML = '<span class="pill" style="background:var(--bg-secondary);color:var(--text-muted);">Total <span class="pill-count">' + leads.length + '</span></span>' +
+    STATUSES.map(s => {
+      if (!counts[s]) return '';
+      const col = STATUS_COLORS[s];
+      return '<span class="pill" style="background:' + col.bg + ';color:' + col.text + ';">' + s + ' <span class="pill-count">' + counts[s] + '</span></span>';
+    }).join('');
+}
+
+function renderTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  const fStatus = document.getElementById('filter-status').value;
+  const fCity = document.getElementById('filter-city').value;
+  const fProv = document.getElementById('filter-province').value;
+  const sortBy = document.getElementById('sort-by').value;
+
+  // Filter
+  let filtered = leads.filter(l => {
+    if (fStatus && l._status !== fStatus) return false;
+    if (fCity && f(l,'city') !== fCity) return false;
+    if (fProv && f(l,'province') !== fProv) return false;
+    if (q) {
+      const hay = [f(l,'businessName'), f(l,'contactName'), f(l,'city'), f(l,'industry'), f(l,'phone')].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a, b) => {
+    if (sortBy === 'newest') {
+      const tA = a._createdAt ? new Date(a._createdAt).getTime() : 0;
+      const tB = b._createdAt ? new Date(b._createdAt).getTime() : 0;
+      return tB - tA; // Newest first
+    } else if (sortBy === 'oldest') {
+      const tA = a._createdAt ? new Date(a._createdAt).getTime() : 0;
+      const tB = b._createdAt ? new Date(b._createdAt).getTime() : 0;
+      return tA - tB; // Oldest first
+    } else if (sortBy === 'name') {
+      const nA = (f(a, 'businessName') || '').toLowerCase();
+      const nB = (f(b, 'businessName') || '').toLowerCase();
+      return nA.localeCompare(nB);
+    } else if (sortBy === 'status') {
+      const sA = a._status || '';
+      const sB = b._status || '';
+      return sA.localeCompare(sB);
+    }
+    return 0;
+  });
+
+  const empty = document.getElementById('empty-state');
+  const table = document.getElementById('leads-table');
+  const count = document.getElementById('result-count');
+  const mobileList = document.getElementById('mobile-leads-list');
+
+  if (!leads.length) { 
+    empty.style.display = 'block'; 
+    table.style.display = 'none'; 
+    mobileList.style.display = 'none';
+    count.textContent = ''; 
+    return; 
+  }
+  
+  empty.style.display = 'none'; 
+  table.style.display = 'table';
+  mobileList.style.display = 'flex';
+  count.textContent = filtered.length + ' of ' + leads.length + ' leads';
+
+  const tbody = document.getElementById('tbody');
+  if (!filtered.length) {
+    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match the current filters.</td></tr>';
+    mobileList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-hint);font-size:13.5px;width:100%;">No leads match the current filters.</div>';
+    return;
+  }
+
+  // Render desktop table
+  tbody.innerHTML = filtered.map((lead, fi) => {
+    const idx = leads.indexOf(lead);
+    const col = STATUS_COLORS[lead._status] || STATUS_COLORS['Not Called'];
+    const phone = f(lead, 'phone');
+    const bName = f(lead, 'businessName') || '—';
+    return '<tr>' +
+      '<td style="color:var(--text-hint);font-size:12px;">' + (idx + 1) + '</td>' +
+      '<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(bName) + '">' + esc(bName) + '</td>' +
+      '<td style="white-space:nowrap;">' + esc(f(lead,'contactName') || '—') + '</td>' +
+      '<td style="white-space:nowrap;"><a href="tel:' + esc(phone) + '" style="color:var(--accent);text-decoration:none;font-weight:500;">' + esc(phone || '—') + '</a></td>' +
+      '<td style="white-space:nowrap;">' + esc(f(lead,'city') || '—') + '</td>' +
+      '<td style="white-space:nowrap;">' + esc(f(lead,'province') || '—') + '</td>' +
+      '<td style="max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(f(lead,'industry') || '—') + '</td>' +
+      '<td><select class="status-select" data-id="' + lead.id + '" onchange="updateStatus(this)" style="background:' + col.bg + ';color:' + col.text + ';border-color:transparent;">' +
+        STATUSES.map(s => '<option' + (lead._status === s ? ' selected' : '') + '>' + s + '</option>').join('') +
+      '</select></td>' +
+      '<td><input class="note-input" type="text" placeholder="Add note…" value="' + esc(lead._note || '') + '" data-id="' + lead.id + '" oninput="updateNote(this)" maxlength="200"></td>' +
+      '<td class="updated-at">' + (lead._updatedAt ? formatTime(lead._updatedAt) : '') + '</td>' +
+      '<td>' +
+        '<button class="btn-danger-icon" onclick="openDeleteModal(\'' + lead.id + '\', \'' + esc(bName).replace(/'/g, "\\'") + '\')" title="Delete Lead">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+        '</button>' +
+      '</td>' +
+    '</tr>';
+  }).join('');
+
+  // Render mobile cards list
+  mobileList.innerHTML = filtered.map((lead, fi) => {
+    const col = STATUS_COLORS[lead._status] || STATUS_COLORS['Not Called'];
+    const phone = f(lead, 'phone');
+    const bName = f(lead, 'businessName') || '—';
+    const cName = f(lead, 'contactName') || '—';
+    return '<div class="mobile-lead-card">' +
+      '<div class="mobile-card-row">' +
+        '<div>' +
+          '<div class="mobile-business-name">' + esc(bName) + '</div>' +
+          '<div class="mobile-contact-name">' + esc(cName) + '</div>' +
+        '</div>' +
+        '<button class="btn-danger-icon" onclick="openDeleteModal(\'' + lead.id + '\', \'' + esc(bName).replace(/'/g, "\\'") + '\')">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
+        '</button>' +
+      '</div>' +
+      '<div class="mobile-card-row" style="margin-top:10px;">' +
+        '<div>' +
+          '<div><a href="tel:' + esc(phone) + '" style="color:var(--accent);text-decoration:none;font-weight:600;font-size:13px;">' + esc(phone || '—') + '</a></div>' +
+          '<div class="mobile-meta">' + esc(f(lead,'city') || '—') + ', ' + esc(f(lead,'province') || '—') + '</div>' +
+        '</div>' +
+        '<div>' +
+          '<select class="status-select" data-id="' + lead.id + '" onchange="updateStatus(this)" style="background:' + col.bg + ';color:' + col.text + ';border-color:transparent;">' +
+            STATUSES.map(s => '<option' + (lead._status === s ? ' selected' : '') + '>' + s + '</option>').join('') +
+          '</select>' +
+        '</div>' +
+      '</div>' +
+      '<div class="mobile-card-row" style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">' +
+        '<input class="note-input" type="text" placeholder="Add note…" value="' + esc(lead._note || '') + '" data-id="' + lead.id + '" oninput="updateNote(this)" maxlength="200" style="max-width:100%;">' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+async function updateStatus(sel) {
+  const id = sel.dataset.id;
+  const col = STATUS_COLORS[sel.value];
+  sel.style.background = col.bg; sel.style.color = col.text;
+  try { 
+    await updateDoc(doc(db, 'leads', id), { _status: sel.value, _updatedAt: serverTimestamp() }); 
+    showToast('Status updated'); 
+  }
+  catch (e) { 
+    showToast('Failed to save status'); 
+  }
+}
+
+function updateNote(input) {
+  const id = input.dataset.id;
+  clearTimeout(noteTimers[id]);
+  noteTimers[id] = setTimeout(async () => {
+    try { 
+      await updateDoc(doc(db, 'leads', id), { _note: input.value, _updatedAt: serverTimestamp() }); 
+    }
+    catch (e) { 
+      showToast('Failed to save note'); 
+    }
+  }, 500);
+}
+
+function formatTime(ts) {
+  const d = ts && typeof ts.toDate === 'function' ? ts.toDate() : new Date(ts);
+  const diff = Math.floor((Date.now() - d) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+  if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+  return d.toLocaleDateString('en-CA', { month: 'short', day: 'numeric' });
+}
+
+function exportCSV() {
+  if (!leads.length) { showToast('No leads to export'); return; }
+  const cols = ['Business Name','Contact Name','Phone','City','Province','Industry','Email','Website','Status','Note'];
+  const rows = [cols.join(',')].concat(leads.map(l => [
+    q(f(l,'businessName')), q(f(l,'contactName')), q(f(l,'phone')),
+    q(f(l,'city')), q(f(l,'province')), q(f(l,'industry')),
+    q(f(l,'email')), q(f(l,'website')), q(l._status), q(l._note||'')
+  ].join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([rows.join('\n')], { type: 'text/csv' }));
+  a.download = 'navain-leads-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  showToast('CSV exported');
+}
+
+function q(v) { return '"' + String(v||'').replace(/"/g,'""') + '"'; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+</script>
+</body>
+</html>

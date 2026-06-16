@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navain AI — Admin Upload</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-tertiary: #f1f5f9;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-hint: #94a3b8;
+    --border: rgba(15, 23, 42, 0.08);
+    --border-strong: rgba(15, 23, 42, 0.15);
+    --accent: #2563eb;
+    --accent-bg: #eff6ff;
+    --accent-text: #1d4ed8;
+    --success-bg: #dcfce7;
+    --success-text: #15803d;
+    --danger-bg: #fee2e2;
+    --danger-text: #b91c1c;
+    --radius: 10px;
+    --radius-lg: 16px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.08);
+    --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b0f19;
+      --bg-secondary: #161f30;
+      --bg-tertiary: #0f1322;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-hint: #64748b;
+      --border: rgba(255, 255, 255, 0.06);
+      --border-strong: rgba(255, 255, 255, 0.12);
+      --accent: #3b82f6;
+      --accent-bg: rgba(59, 130, 246, 0.1);
+      --accent-text: #60a5fa;
+      --success-bg: rgba(34, 197, 94, 0.12);
+      --success-text: #4ade80;
+      --danger-bg: rgba(239, 68, 68, 0.12);
+      --danger-text: #f87171;
+    }
+  }
+  body { 
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+    background: var(--bg-tertiary); 
+    color: var(--text); 
+    min-height: 100vh;
+    transition: var(--transition);
+  }
+  header { 
+    background: rgba(255, 255, 255, 0.75); 
+    backdrop-filter: blur(12px); 
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border); 
+    padding: 0 24px; 
+    height: 64px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  @media (prefers-color-scheme: dark) {
+    header {
+      background: rgba(11, 15, 25, 0.75);
+    }
+  }
+  .logo { 
+    font-family: 'Outfit', sans-serif;
+    font-size: 18px; 
+    font-weight: 700; 
+    color: var(--text); 
+    text-decoration: none; 
+    letter-spacing: -0.03em; 
+  }
+  .logo span { color: var(--accent); }
+  
+  .nav-link { 
+    font-size: 13px; 
+    font-weight: 500;
+    color: var(--text-muted); 
+    text-decoration: none; 
+    padding: 8px 16px; 
+    border: 1px solid var(--border-strong); 
+    border-radius: var(--radius); 
+    transition: var(--transition); 
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg);
+  }
+  .nav-link:hover { 
+    background: var(--bg-secondary);
+    color: var(--text);
+    box-shadow: var(--shadow-sm);
+  }
+  main { max-width: 800px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-family: 'Outfit', sans-serif; font-size: 28px; font-weight: 700; margin-bottom: 8px; letter-spacing: -0.02em; }
+  .subtitle { font-size: 15px; color: var(--text-muted); margin-bottom: 32px; line-height: 1.5; }
+  
+  .card { 
+    background: var(--bg); 
+    border: 1px solid var(--border); 
+    border-radius: var(--radius-lg); 
+    padding: 28px; 
+    margin-bottom: 24px; 
+    box-shadow: var(--shadow-md);
+    transition: var(--transition);
+  }
+  .card:hover {
+    box-shadow: var(--shadow-lg);
+  }
+  .card-title { 
+    font-family: 'Outfit', sans-serif;
+    font-size: 14px; 
+    font-weight: 600; 
+    color: var(--text-muted); 
+    text-transform: uppercase; 
+    letter-spacing: 0.08em; 
+    margin-bottom: 18px; 
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  
+  .drop-zone { 
+    border: 2px dashed var(--border-strong); 
+    border-radius: var(--radius); 
+    padding: 48px 24px; 
+    text-align: center; 
+    cursor: pointer; 
+    transition: var(--transition); 
+    background: var(--bg-secondary); 
+  }
+  .drop-zone:hover, .drop-zone.drag-over { 
+    border-color: var(--accent); 
+    background: var(--accent-bg); 
+  }
+  .drop-zone svg { 
+    width: 40px; 
+    height: 40px; 
+    stroke: var(--accent); 
+    margin: 0 auto 16px; 
+    display: block; 
+    transition: var(--transition);
+  }
+  .drop-zone:hover svg {
+    transform: translateY(-4px);
+  }
+  .drop-zone p { font-size: 15px; font-weight: 500; color: var(--text); margin-bottom: 6px; }
+  .drop-zone small { font-size: 12px; color: var(--text-hint); }
+  #file-input { display: none; }
+  
+  .btn { 
+    display: inline-flex; 
+    align-items: center; 
+    justify-content: center;
+    gap: 8px; 
+    padding: 10px 18px; 
+    font-size: 14px; 
+    font-weight: 600; 
+    border-radius: var(--radius); 
+    border: 1px solid var(--border-strong); 
+    background: var(--bg); 
+    color: var(--text); 
+    cursor: pointer; 
+    transition: var(--transition); 
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:hover { 
+    background: var(--bg-secondary); 
+    box-shadow: var(--shadow-md);
+  }
+  .btn-primary { 
+    background: var(--accent); 
+    border-color: var(--accent); 
+    color: #fff; 
+  }
+  .btn-primary:hover { 
+    opacity: 0.95; 
+    background: var(--accent); 
+    transform: translateY(-1px);
+  }
+  .btn-danger { 
+    color: var(--danger-text); 
+    border-color: transparent;
+    background: var(--danger-bg);
+  }
+  .btn-danger:hover { 
+    filter: brightness(0.95);
+    box-shadow: var(--shadow-md);
+  }
+  .info-note { 
+    background: var(--accent-bg); 
+    border: 1px solid rgba(37, 99, 235, 0.15); 
+    border-radius: var(--radius); 
+    padding: 14px 18px; 
+    margin-top: 18px; 
+    font-size: 13px; 
+    color: var(--accent-text); 
+    line-height: 1.5;
+  }
+  #preview-section { display: none; }
+  .preview-table-wrap { 
+    overflow-x: auto; 
+    border-radius: var(--radius); 
+    border: 1px solid var(--border); 
+    box-shadow: var(--shadow-sm);
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+  th { background: var(--bg-secondary); padding: 12px 14px; text-align: left; font-weight: 600; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  
+  .count-badge { 
+    display: inline-flex; 
+    align-items: center;
+    padding: 3px 10px; 
+    border-radius: 20px; 
+    font-size: 11px; 
+    font-weight: 600; 
+    background: var(--accent-bg); 
+    color: var(--accent-text); 
+  }
+  .actions { display: flex; gap: 12px; margin-top: 24px; flex-wrap: wrap; }
+  
+  .toast { 
+    position: fixed; 
+    bottom: 24px; 
+    left: 50%; 
+    transform: translateX(-50%) translateY(80px); 
+    background: var(--text); 
+    color: var(--bg); 
+    padding: 12px 24px; 
+    border-radius: 30px; 
+    font-size: 14px; 
+    font-weight: 600; 
+    box-shadow: var(--shadow-lg);
+    transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275); 
+    z-index: 999; 
+    white-space: nowrap; 
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  
+  .alert { padding: 14px 18px; border-radius: var(--radius); font-size: 13.5px; margin-top: 18px; line-height: 1.5; font-weight: 500; }
+  .alert-success { background: var(--success-bg); color: var(--success-text); border: 1px solid rgba(21, 128, 61, 0.1); }
+  .alert-danger { background: var(--danger-bg); color: var(--danger-text); border: 1px solid rgba(185, 28, 28, 0.1); }
+  
+  .current-leads-info { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .current-leads-info p { font-size: 15px; font-weight: 500; color: var(--text-muted); }
+  
+  .col-map { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+  .col-map-row { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+  .col-map-row label { color: var(--text-muted); font-weight: 600; font-size: 12.5px; }
+  .col-map-row select { 
+    width: 100%; 
+    padding: 10px 14px; 
+    border: 1px solid var(--border-strong); 
+    border-radius: var(--radius); 
+    background: var(--bg); 
+    color: var(--text); 
+    font-size: 13.5px; 
+    outline: none;
+    transition: var(--transition);
+    cursor: pointer;
+  }
+  .col-map-row select:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  #mapping-section { display: none; }
+  @media (max-width: 600px) { 
+    .col-map { grid-template-columns: 1fr; } 
+    main { padding: 24px 16px 60px; } 
+    h1 { font-size: 22px; } 
+    .card { padding: 20px 16px; } 
+  }
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="index.html">Navain <span>AI</span></a>
+  <a class="nav-link" href="index.html">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+    Back to tracker
+  </a>
+</header>
+
+<main>
+  <h1>Admin Portal</h1>
+  <p class="subtitle">Upload dataset CSV files. Map your headers to tracker properties and instantly append new records.</p>
+
+  <div class="card">
+    <div class="card-title">Database Status</div>
+    <div class="current-leads-info">
+      <p id="current-count">Loading status...</p>
+      <button class="btn btn-danger" onclick="clearLeads()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        Clear all leads
+      </button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Upload Dataset</div>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="17 8 12 3 7 8"/>
+        <line x1="12" y1="3" x2="12" y2="15"/>
+      </svg>
+      <p>Drop CSV file here or click to browse</p>
+      <small>Accepts any standard comma-separated file</small>
+    </div>
+    <input type="file" id="file-input" accept=".csv" onchange="handleFile(this.files[0])">
+    <div class="info-note"><strong>Note:</strong> Upload any layout CSV. You will map standard columns (Name, Phone, City, etc.) on the next step. Existing records will be preserved.</div>
+    <div id="upload-alert"></div>
+  </div>
+
+  <!-- Column Mapping Section -->
+  <div class="card" id="mapping-section">
+    <div class="card-title">Map Fields <span class="count-badge" id="mapping-count">0 rows</span></div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Map your CSV headers to tracker attributes. Skip unneeded ones.</p>
+    <div class="col-map" id="col-map"></div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="applyMapping()">
+        Preview Mapped Data
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+      <button class="btn" onclick="cancelMapping()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Preview Section -->
+  <div class="card" id="preview-section">
+    <div class="card-title">Dataset Preview <span class="count-badge" id="preview-count">0 leads</span></div>
+    <div class="preview-table-wrap">
+      <table id="preview-table">
+        <thead id="preview-head"></thead>
+        <tbody id="preview-body"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" onclick="publishLeads()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Publish and Append to Tracker
+      </button>
+      <button class="btn" onclick="cancelPreview()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        Back to Mapping
+      </button>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script type="module">
+import { db, authReady } from './firebase-init.js';
+import { collection, getDocs, setDoc, deleteDoc, doc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+
+await authReady;
+
+// Tracker fields
+const TRACKER_FIELDS = [
+  { key: 'businessName',  label: 'Business Name' },
+  { key: 'contactName',   label: 'Contact Name' },
+  { key: 'phone',         label: 'Phone' },
+  { key: 'email',         label: 'Email' },
+  { key: 'city',          label: 'City' },
+  { key: 'province',      label: 'Province' },
+  { key: 'industry',      label: 'Industry' },
+  { key: 'website',       label: 'Website' },
+  { key: 'linkedin',      label: 'LinkedIn' },
+  { key: 'jobTitle',      label: 'Job Title' },
+];
+
+// Auto-mapping guesses based on common CSV column names
+const AUTO_MAP = {
+  businessName:  ['business name','company','company name','prospect_company_name','organization','salon name','business'],
+  contactName:   ['contact name','name','full name','prospect_full_name','contact','person'],
+  phone:         ['phone','mobile','contact_mobile_phone','telephone','cell','phone number'],
+  email:         ['email','contact_professions_email','e-mail','email address','mail'],
+  city:          ['city','profile_city','town','location'],
+  province:      ['province','state','region','province/state'],
+  industry:      ['industry','sector','type','category','prospect_job_title','job title','niche'],
+  website:       ['website','url','web','prospect_company_website','site','domain'],
+  linkedin:      ['linkedin','linkedin url','prospect_linkedin','li','profile'],
+  jobTitle:      ['job title','title','role','position','prospect_job_title'],
+};
+
+let rawHeaders = [];
+let rawRows = [];
+let parsedLeads = [];
+
+// Load current count from Firestore
+async function showCurrentCount() {
+  try {
+    const snap = await getDocs(collection(db, 'leads'));
+    const el = document.getElementById('current-count');
+    el.textContent = snap.size === 0 ? 'No leads uploaded yet.' : snap.size + ' leads currently in the tracker.';
+  } catch(e) {
+    document.getElementById('current-count').textContent = 'Could not load count.';
+  }
+}
+showCurrentCount();
+
+// Drag & drop
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+
+window.handleFile = function(file) {
+  if (!file || !file.name.endsWith('.csv')) { showAlert('Please upload a .csv file.', 'danger'); return; }
+  const reader = new FileReader();
+  reader.onload = e => parseCSV(e.target.result);
+  reader.readAsText(file);
+};
+
+function parseCSV(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) { showAlert('CSV appears empty.', 'danger'); return; }
+  rawHeaders = splitLine(lines[0]).map(h => h.trim().replace(/^"|"$/g,''));
+  rawRows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = splitLine(lines[i]);
+    const row = {};
+    rawHeaders.forEach((h, idx) => { row[h] = (vals[idx]||'').trim().replace(/^"|"$/g,''); });
+    rawRows.push(row);
+  }
+  if (rawRows.length === 0) { showAlert('No data rows found.', 'danger'); return; }
+  showAlert('', '');
+  showMappingUI();
+}
+
+function splitLine(line) {
+  const result = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function guessMapping(trackerKey) {
+  const guesses = AUTO_MAP[trackerKey] || [];
+  for (const guess of guesses) {
+    const found = rawHeaders.find(h => h.toLowerCase().trim() === guess.toLowerCase());
+    if (found) return found;
+  }
+  return '';
+}
+
+function showMappingUI() {
+  document.getElementById('mapping-count').textContent = rawRows.length + ' rows';
+  const container = document.getElementById('col-map');
+  container.innerHTML = TRACKER_FIELDS.map(field => {
+    const guess = guessMapping(field.key);
+    const options = ['<option value="">— skip —</option>',
+      ...rawHeaders.map(h => `<option value="${h}" ${h === guess ? 'selected' : ''}>${h}</option>`)
+    ].join('');
+    return `<div class="col-map-row">
+      <label>${field.label}</label>
+      <select id="map-${field.key}">${options}</select>
+    </div>`;
+  }).join('');
+  document.getElementById('mapping-section').style.display = 'block';
+  document.getElementById('preview-section').style.display = 'none';
+}
+
+window.cancelMapping = function() {
+  document.getElementById('mapping-section').style.display = 'none';
+  document.getElementById('file-input').value = '';
+};
+
+window.applyMapping = function() {
+  const mapping = {};
+  TRACKER_FIELDS.forEach(f => {
+    const val = document.getElementById('map-' + f.key).value;
+    if (val) mapping[f.key] = val;
+  });
+
+  parsedLeads = rawRows.map(row => {
+    const lead = { _status: 'Not Called', _note: '', _updatedAt: '' };
+    TRACKER_FIELDS.forEach(f => {
+      lead[f.key] = mapping[f.key] ? (row[mapping[f.key]] || '') : '';
+    });
+    return lead;
+  });
+
+  renderPreview();
+};
+
+function renderPreview() {
+  const displayFields = TRACKER_FIELDS.filter(f => parsedLeads[0] && parsedLeads[0][f.key] !== undefined);
+  const head = document.getElementById('preview-head');
+  const body = document.getElementById('preview-body');
+  head.innerHTML = '<tr>' + displayFields.map(f => `<th>${f.label}</th>`).join('') + '</tr>';
+  const sample = parsedLeads.slice(0, 8);
+  body.innerHTML = sample.map(row =>
+    '<tr>' + displayFields.map(f => `<td title="${row[f.key]||''}">${row[f.key] || '—'}</td>`).join('') + '</tr>'
+  ).join('');
+  if (parsedLeads.length > 8) {
+    body.innerHTML += `<tr><td colspan="${displayFields.length}" style="text-align:center;color:var(--text-hint);font-size:12px;padding:10px;">… and ${parsedLeads.length - 8} more rows</td></tr>`;
+  }
+  document.getElementById('preview-count').textContent = parsedLeads.length + ' lead' + (parsedLeads.length !== 1 ? 's' : '');
+  document.getElementById('mapping-section').style.display = 'none';
+  document.getElementById('preview-section').style.display = 'block';
+}
+
+window.cancelPreview = function() {
+  document.getElementById('preview-section').style.display = 'none';
+  showMappingUI();
+};
+
+window.publishLeads = async function() {
+  try {
+    showToast('Publishing…');
+
+    // Write new leads in batches of 500
+    let count = 0;
+    let b = writeBatch(db);
+    for (const lead of parsedLeads) {
+      const ref = doc(collection(db, 'leads'));
+      b.set(ref, { ...lead, _id: ref.id, _createdAt: new Date().toISOString() });
+      count++;
+      if (count % 499 === 0) { await b.commit(); b = writeBatch(db); }
+    }
+    await b.commit();
+
+    showToast('✓ ' + parsedLeads.length + ' leads published!');
+    document.getElementById('preview-section').style.display = 'none';
+    parsedLeads = [];
+    document.getElementById('file-input').value = '';
+    showCurrentCount();
+  } catch(e) {
+    showAlert('Error publishing: ' + e.message, 'danger');
+  }
+};
+
+window.clearLeads = async function() {
+  const snap = await getDocs(collection(db, 'leads'));
+  if (!confirm('Remove all ' + snap.size + ' leads? This cannot be undone.')) return;
+  const batch = writeBatch(db);
+  snap.forEach(d => batch.delete(d.ref));
+  await batch.commit();
+  showCurrentCount();
+  showToast('All leads cleared');
+};
+
+function showAlert(msg, type) {
+  const el = document.getElementById('upload-alert');
+  el.innerHTML = msg ? `<div class="alert alert-${type}">${msg}</div>` : '';
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
