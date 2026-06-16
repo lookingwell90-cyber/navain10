@@ -281,6 +281,7 @@
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
   #mapping-section { display: none; }
+  .hidden { display: none !important; }
   @media (max-width: 600px) { 
     .col-map { grid-template-columns: 1fr; } 
     main { padding: 24px 16px 60px; } 
@@ -416,7 +417,7 @@
 
 <script type="module">
 import { db, auth, firebaseConfig } from './firebase-init.js';
-import { collection, getDocs, setDoc, deleteDoc, doc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, getDocs, setDoc, deleteDoc, doc, writeBatch, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -456,10 +457,21 @@ let parsedLeads = [];
 // Load current count from Firestore
 async function showCurrentCount() {
   try {
-    const snap = await getDocs(collection(db, 'leads'));
+    let q;
+    if (userRole === 'admin') {
+      q = collection(db, 'leads');
+    } else {
+      q = query(collection(db, 'leads'), where('assignedTo', '==', currentUser.uid));
+    }
+    const snap = await getDocs(q);
     const el = document.getElementById('current-count');
-    el.textContent = snap.size === 0 ? 'No leads uploaded yet.' : snap.size + ' leads currently in the tracker.';
+    if (userRole === 'admin') {
+      el.textContent = snap.size === 0 ? 'No leads uploaded yet.' : snap.size + ' leads currently in the tracker.';
+    } else {
+      el.textContent = snap.size === 0 ? 'No leads assigned to you yet.' : snap.size + ' leads currently assigned to you.';
+    }
   } catch(e) {
+    console.error(e);
     document.getElementById('current-count').textContent = 'Could not load count.';
   }
 }
