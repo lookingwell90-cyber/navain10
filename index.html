@@ -891,19 +891,18 @@ onAuthStateChanged(auth, async (user) => {
   const userName = localStorage.getItem('user_name') || 'User';
   document.getElementById('user-display').textContent = userName + ` (${userRole === 'admin' ? 'Admin' : 'Agent'})`;
 
-  document.getElementById('admin-portal-btn').classList.remove('hidden');
   if (userRole === 'admin') {
     document.getElementById('admin-portal-btn-label').textContent = 'Admin Portal';
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
-      employees = usersSnap.docs.map(d => d.data()).filter(u => u.role === 'employee');
+      employees = usersSnap.docs.map(d => d.data());
       
       const filterEmp = document.getElementById('filter-employee');
       if (filterEmp) {
         filterEmp.classList.remove('hidden');
-        filterEmp.innerHTML = '<option value="">All Employees</option>' +
+        filterEmp.innerHTML = '<option value="">All Accounts</option>' +
           '<option value="unassigned">Unassigned Leads</option>' +
-          employees.map(emp => '<option value="' + emp.uid + '">' + esc(emp.name) + '</option>').join('');
+          employees.map(emp => '<option value="' + emp.uid + '">' + esc(emp.name) + ' (' + (emp.role === 'admin' ? 'Admin' : 'Employee') + ')</option>').join('');
       }
     } catch(err) {
       console.error("Error loading employees", err);
@@ -1076,7 +1075,7 @@ function renderTable() {
     if (userRole === 'admin') {
       assignDropdown = '<td><select class="status-select" data-id="' + lead.id + '" onchange="updateAssignment(this)" style="background:var(--bg-secondary);color:var(--text);border-color:var(--border-strong);max-width:140px;">' +
         '<option value="">Unassigned</option>' +
-        employees.map(emp => '<option value="' + emp.uid + '"' + (lead.assignedTo === emp.uid ? ' selected' : '') + '>' + esc(emp.name) + '</option>').join('') +
+        employees.map(emp => '<option value="' + emp.uid + '"' + (lead.assignedTo === emp.uid ? ' selected' : '') + '>' + esc(emp.name) + ' (' + (emp.role === 'admin' ? 'Admin' : 'Employee') + ')</option>').join('') +
       '</select></td>';
     } else {
       assignDropdown = '<td><span style="font-size:12px;color:var(--text-muted);">' + esc(lead.assignedName || '—') + '</span></td>';
@@ -1120,7 +1119,7 @@ function renderTable() {
         '<span style="font-size:12px;font-weight:600;color:var(--text-muted);">Assign:</span>' +
         '<select class="status-select" data-id="' + lead.id + '" onchange="updateAssignment(this)" style="background:var(--bg-secondary);color:var(--text);border-color:var(--border-strong);max-width:140px;">' +
           '<option value="">Unassigned</option>' +
-          employees.map(emp => '<option value="' + emp.uid + '"' + (lead.assignedTo === emp.uid ? ' selected' : '') + '>' + esc(emp.name) + '</option>').join('') +
+          employees.map(emp => '<option value="' + emp.uid + '"' + (lead.assignedTo === emp.uid ? ' selected' : '') + '>' + esc(emp.name) + ' (' + (emp.role === 'admin' ? 'Admin' : 'Employee') + ')</option>').join('') +
         '</select>' +
       '</div>';
     } else {
