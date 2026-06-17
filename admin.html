@@ -282,9 +282,52 @@
   }
   #mapping-section { display: none; }
   .hidden { display: none !important; }
-  @media (max-width: 600px) { 
-    .col-map { grid-template-columns: 1fr; } 
-    main { padding: 24px 16px 60px; } 
+  .enrich-progress {
+    margin-top: 16px;
+    padding: 14px 18px;
+    background: var(--accent-bg);
+    border: 1px solid rgba(37, 99, 235, 0.15);
+    border-radius: var(--radius);
+    font-size: 13px;
+    color: var(--accent-text);
+    line-height: 1.5;
+  }
+  .enrich-progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+    margin-top: 8px;
+    overflow: hidden;
+  }
+  .enrich-progress-bar-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s ease;
+    width: 0%;
+  }
+  .enrich-stat {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-right: 6px;
+    margin-top: 6px;
+  }
+  .enrich-stat.success { background: var(--success-bg); color: var(--success-text); }
+  .enrich-stat.fail { background: var(--danger-bg); color: var(--danger-text); }
+  @keyframes enrichPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+  .enriching { animation: enrichPulse 1.5s infinite; }
+   @media (max-width: 600px) { 
+     .col-map { grid-template-columns: 1fr; } 
+     main { padding: 24px 16px 60px; } 
     h1 { font-size: 22px; } 
     .card { padding: 20px 16px; } 
   }
@@ -413,6 +456,7 @@
   <!-- Preview Section -->
   <div class="card" id="preview-section">
     <div class="card-title">Dataset Preview <span class="count-badge" id="preview-count">0 leads</span></div>
+    <div id="enrich-progress-container" style="display:none;"></div>
     <div class="preview-table-wrap">
       <table id="preview-table">
         <thead id="preview-head"></thead>
@@ -420,7 +464,7 @@
       </table>
     </div>
     <div class="actions">
-      <button class="btn btn-primary" onclick="publishLeads()">
+      <button class="btn btn-primary" id="publish-btn" onclick="publishLeads()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
         Publish and Append to Tracker
       </button>
@@ -826,6 +870,12 @@ function parseCSV(text) {
     }
     showAlert(verificationMsg, 'success');
     renderPreview();
+
+    // Auto-enrich leads from links
+    const leadsWithLinks = parsedLeads.filter(l => l.website && l.website.startsWith('http'));
+    if (leadsWithLinks.length > 0) {
+      fetchAndEnrichLeads(leadsWithLinks);
+    }
   } else {
     showMappingUI();
   }
@@ -897,16 +947,204 @@ function renderPreview() {
   const head = document.getElementById('preview-head');
   const body = document.getElementById('preview-body');
   head.innerHTML = '<tr>' + displayFields.map(f => `<th>${f.label}</th>`).join('') + '</tr>';
-  const sample = parsedLeads.slice(0, 8);
+  const sample = parsedLeads.slice(0, 15);
   body.innerHTML = sample.map(row =>
-    '<tr>' + displayFields.map(f => `<td title="${row[f.key]||''}">${row[f.key] || '—'}</td>`).join('') + '</tr>'
+    '<tr>' + displayFields.map(f => {
+      const val = row[f.key] || '';
+      const isUrl = val.startsWith('http');
+      const display = isUrl ? '<a href="' + esc(val) + '" target="_blank" style="color:var(--accent);text-decoration:none;">' + esc(val.replace(/^https?:\/\//, '').substring(0, 30)) + '…</a>' : esc(val || '—');
+      return `<td title="${esc(val)}">${display}</td>`;
+    }).join('') + '</tr>'
   ).join('');
-  if (parsedLeads.length > 8) {
-    body.innerHTML += `<tr><td colspan="${displayFields.length}" style="text-align:center;color:var(--text-hint);font-size:12px;padding:10px;">… and ${parsedLeads.length - 8} more rows</td></tr>`;
+  if (parsedLeads.length > 15) {
+    body.innerHTML += `<tr><td colspan="${displayFields.length}" style="text-align:center;color:var(--text-hint);font-size:12px;padding:10px;">… and ${parsedLeads.length - 15} more rows</td></tr>`;
   }
   document.getElementById('preview-count').textContent = parsedLeads.length + ' lead' + (parsedLeads.length !== 1 ? 's' : '');
   document.getElementById('mapping-section').style.display = 'none';
   document.getElementById('preview-section').style.display = 'block';
+}
+
+// ========== AUTO-ENRICHMENT FROM LINKS ==========
+
+const CORS_PROXIES = [
+  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
+];
+
+async function fetchWithProxy(url) {
+  for (const makeProxy of CORS_PROXIES) {
+    try {
+      const proxyUrl = makeProxy(url);
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const resp = await fetch(proxyUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (resp.ok) {
+        const text = await resp.text();
+        if (text && text.length > 500) return text;
+      }
+    } catch (e) { /* try next proxy */ }
+  }
+  return null;
+}
+
+function extractFromHTML(html, url) {
+  const info = { phone: '', city: '', province: '', industry: '' };
+  
+  try {
+    // Try JSON-LD structured data first (most reliable)
+    const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
+    if (jsonLdMatches) {
+      for (const match of jsonLdMatches) {
+        try {
+          const jsonStr = match.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
+          const data = JSON.parse(jsonStr);
+          const biz = Array.isArray(data) ? data.find(d => d['@type'] && (d['@type'].includes('LocalBusiness') || d['@type'].includes('Organization') || d['@type'].includes('Restaurant') || d['@type'] === 'Store')) : data;
+          if (biz) {
+            if (biz.telephone && !info.phone) info.phone = biz.telephone;
+            if (biz.address) {
+              const addr = typeof biz.address === 'string' ? {} : biz.address;
+              if (addr.addressLocality && !info.city) info.city = addr.addressLocality;
+              if (addr.addressRegion && !info.province) info.province = addr.addressRegion;
+            }
+            if (biz.servesCuisine && !info.industry) info.industry = Array.isArray(biz.servesCuisine) ? biz.servesCuisine[0] : biz.servesCuisine;
+            if (biz.priceRange && !info.industry) info.industry = biz.priceRange;
+          }
+        } catch (e) { /* skip malformed JSON-LD */ }
+      }
+    }
+
+    // Parse as DOM for additional scraping
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // Yelp-specific selectors
+    if (url.includes('yelp.')) {
+      if (!info.phone) {
+        // Yelp phone patterns
+        const phoneMatch = html.match(/"phoneNumber"\s*:\s*"([^"]+)"/i) || html.match(/"phone"\s*:\s*"([^"]+)"/i);
+        if (phoneMatch) info.phone = phoneMatch[1];
+      }
+      if (!info.city) {
+        const cityMatch = html.match(/"addressLocality"\s*:\s*"([^"]+)"/i);
+        if (cityMatch) info.city = cityMatch[1];
+      }
+      if (!info.province) {
+        const provMatch = html.match(/"addressRegion"\s*:\s*"([^"]+)"/i);
+        if (provMatch) info.province = provMatch[1];
+      }
+      if (!info.industry) {
+        const catMatch = html.match(/"category"\s*:\s*"([^"]+)"/i) || html.match(/"categories"\s*:\s*\[\s*\{[^}]*"title"\s*:\s*"([^"]+)"/i);
+        if (catMatch) info.industry = catMatch[1] || catMatch[2];
+      }
+    }
+
+    // Yellow Pages Canada specific selectors
+    if (url.includes('yellowpages.ca') || url.includes('yp.ca')) {
+      if (!info.phone) {
+        const phoneEl = doc.querySelector('.mlr__item__phone, .jsMapBubblePhone, [class*="phone"]');
+        if (phoneEl) info.phone = phoneEl.textContent.trim();
+        if (!info.phone) {
+          const phoneMatch = html.match(/(\(\d{3}\)\s*\d{3}-\d{4})/) || html.match(/(\d{3}-\d{3}-\d{4})/);
+          if (phoneMatch) info.phone = phoneMatch[1];
+        }
+      }
+      if (!info.city) {
+        const cityEl = doc.querySelector('.mlr__item__locality, [class*="locality"]');
+        if (cityEl) {
+          const parts = cityEl.textContent.trim().split(',');
+          info.city = parts[0] ? parts[0].trim() : '';
+          if (parts[1] && !info.province) info.province = parts[1].trim();
+        }
+      }
+      if (!info.industry) {
+        const catEl = doc.querySelector('.mlr__item__cat, [class*="category"]');
+        if (catEl) info.industry = catEl.textContent.trim();
+      }
+    }
+
+    // Generic fallback: try common phone patterns from any HTML
+    if (!info.phone) {
+      const phoneRegex = /(?:tel:|"|>)\s*\+?1?\s*[\(]?(\d{3})[\)]?[\s.-]?(\d{3})[\s.-]?(\d{4})(?:["<])/;
+      const match = html.match(phoneRegex);
+      if (match) info.phone = `(${match[1]}) ${match[2]}-${match[3]}`;
+    }
+
+  } catch (e) {
+    console.warn('Enrichment parse error:', e);
+  }
+  
+  return info;
+}
+
+async function fetchAndEnrichLeads(leadsWithLinks) {
+  const container = document.getElementById('enrich-progress-container');
+  const publishBtn = document.getElementById('publish-btn');
+  container.style.display = 'block';
+  publishBtn.disabled = true;
+  publishBtn.style.opacity = '0.5';
+  
+  const total = leadsWithLinks.length;
+  let processed = 0;
+  let enriched = 0;
+  let failed = 0;
+
+  container.innerHTML = `
+    <div class="enrich-progress enriching">
+      <strong>🔍 Auto-Enrichment in Progress</strong><br>
+      <span id="enrich-status">Fetching business details from links… (0/${total})</span>
+      <div class="enrich-progress-bar"><div class="enrich-progress-bar-fill" id="enrich-bar"></div></div>
+      <div id="enrich-stats" style="margin-top:6px;"></div>
+    </div>`;
+
+  // Process leads in batches of 3 to avoid overwhelming proxies
+  const batchSize = 3;
+  for (let i = 0; i < leadsWithLinks.length; i += batchSize) {
+    const batch = leadsWithLinks.slice(i, i + batchSize);
+    const promises = batch.map(async (lead) => {
+      try {
+        const html = await fetchWithProxy(lead.website);
+        if (html) {
+          const info = extractFromHTML(html, lead.website);
+          let didEnrich = false;
+          if (info.phone && !lead.phone) { lead.phone = info.phone; didEnrich = true; }
+          if (info.city && !lead.city) { lead.city = info.city; didEnrich = true; }
+          if (info.province && !lead.province) { lead.province = info.province; didEnrich = true; }
+          if (info.industry && !lead.industry) { lead.industry = info.industry; didEnrich = true; }
+          if (didEnrich) enriched++;
+          else failed++;
+        } else {
+          failed++;
+        }
+      } catch (e) {
+        failed++;
+      }
+      processed++;
+      const pct = Math.round((processed / total) * 100);
+      document.getElementById('enrich-bar').style.width = pct + '%';
+      document.getElementById('enrich-status').textContent = `Fetching business details from links… (${processed}/${total})`;
+      document.getElementById('enrich-stats').innerHTML = 
+        `<span class="enrich-stat success">✓ ${enriched} enriched</span>` +
+        `<span class="enrich-stat fail">✗ ${failed} skipped</span>`;
+    });
+    await Promise.all(promises);
+  }
+
+  // Final status
+  container.innerHTML = `
+    <div class="enrich-progress" style="border-color: rgba(22, 163, 74, 0.2); background: var(--success-bg); color: var(--success-text);">
+      <strong>✓ Auto-Enrichment Complete</strong><br>
+      Processed ${total} links: <strong>${enriched}</strong> leads enriched with new data, <strong>${failed}</strong> skipped (blocked or no data found).
+    </div>`;
+
+  publishBtn.disabled = false;
+  publishBtn.style.opacity = '1';
+  
+  // Re-render the preview table with enriched data
+  renderPreview();
+  // Keep the enrichment progress visible
+  container.style.display = 'block';
 }
 
 window.cancelPreview = function() {
