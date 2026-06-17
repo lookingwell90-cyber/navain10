@@ -319,6 +319,18 @@
         Clear all leads
       </button>
     </div>
+    <div id="delete-employee-leads-section" style="display: flex; align-items: flex-end; gap: 12px; margin-top: 18px; flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: 18px;" class="hidden">
+      <div class="form-group" style="margin: 0; min-width: 200px;">
+        <label for="delete-employee-leads-select" style="font-size:12px;font-weight:600;color:var(--text-muted);">Delete Leads Assigned To:</label>
+        <select id="delete-employee-leads-select" style="width: 100%; padding: 8px 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 13px; outline: none; cursor: pointer; margin-top: 4px;">
+          <option value="">— Select Employee —</option>
+        </select>
+      </div>
+      <button class="btn btn-danger" onclick="deleteEmployeeLeads()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Delete Selected Employee's Leads
+      </button>
+    </div>
   </div>
 
   <div class="card" id="employee-manager-card">
@@ -499,11 +511,15 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('employee-manager-card').classList.remove('hidden');
     document.getElementById('clear-leads-btn').classList.remove('hidden');
     document.getElementById('csv-assignee-group').classList.remove('hidden');
+    const delSection = document.getElementById('delete-employee-leads-section');
+    if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
   } else {
     document.getElementById('employee-manager-card').classList.add('hidden');
     document.getElementById('clear-leads-btn').classList.add('hidden');
     document.getElementById('csv-assignee-group').classList.add('hidden');
+    const delSection = document.getElementById('delete-employee-leads-section');
+    if (delSection) delSection.classList.add('hidden');
   }
   
   await showCurrentCount();
@@ -529,6 +545,7 @@ async function loadEmployees() {
     if (employees.length === 0) {
       container.innerHTML = '<p style="font-size: 13px; color: var(--text-hint);">No employees registered yet.</p>';
       populateCSVAssignDropdown();
+      populateDeleteEmployeeLeadsDropdown();
       return;
     }
     
@@ -545,6 +562,7 @@ async function loadEmployees() {
     }).join('');
     
     populateCSVAssignDropdown();
+    populateDeleteEmployeeLeadsDropdown();
   } catch (err) {
     console.error("Error loading employees", err);
     document.getElementById('employees-list').innerHTML = '<p style="font-size: 13px; color: var(--danger-text);">Error loading employees.</p>';
@@ -610,6 +628,52 @@ function populateCSVAssignDropdown() {
   el.value = currentVal;
 }
 
+function populateDeleteEmployeeLeadsDropdown() {
+  const el = document.getElementById('delete-employee-leads-select');
+  if (!el) return;
+  const currentVal = el.value;
+  el.innerHTML = '<option value="">— Select Employee —</option>' + 
+    employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)}</option>`).join('');
+  el.value = currentVal;
+}
+
+async function deleteEmployeeLeads() {
+  const selectEl = document.getElementById('delete-employee-leads-select');
+  const assignedTo = selectEl.value;
+  if (!assignedTo) {
+    showToast('Please select an employee first');
+    return;
+  }
+  const emp = employees.find(e => e.uid === assignedTo);
+  const name = emp ? emp.name : 'Selected Agent';
+  
+  try {
+    const q = query(collection(db, 'leads'), where('assignedTo', '==', assignedTo));
+    const snap = await getDocs(q);
+    if (snap.empty) {
+      showToast(`No leads found for ${name}`);
+      return;
+    }
+    
+    if (!confirm(`Are you sure you want to delete all ${snap.size} leads assigned to ${name}? This cannot be undone.`)) {
+      return;
+    }
+    
+    showToast('Deleting employee leads...');
+    const batch = writeBatch(db);
+    snap.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    
+    showToast(`✓ Deleted ${snap.size} leads for ${name}`);
+    selectEl.value = '';
+    await showCurrentCount();
+  } catch (err) {
+    console.error(err);
+    showToast('Error deleting employee leads');
+  }
+}
+window.deleteEmployeeLeads = deleteEmployeeLeads;
+
 // Drag & drop
 const dropZone = document.getElementById('drop-zone');
 dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
@@ -627,29 +691,33 @@ function autoVerifyAndMap(headers, rows) {
   let businessKey = '';
   let websiteKey = '';
   
-  const linkRegex = /(yelp\.(com|ca)|yellowpages\.(ca|com)|yp\.ca)/i;
-  
-  // 1. Scan rows to find a column containing these URLs
+  // 1. Scan rows to find a column containing general URLs, excluding LinkedIn URLs
   for (const h of headers) {
     let matches = 0;
+    let containsLinkedIn = false;
     const sampleCount = Math.min(rows.length, 5);
     for (let i = 0; i < sampleCount; i++) {
-      const val = rows[i][h] || '';
-      if (val.startsWith('http') && linkRegex.test(val)) {
-        matches++;
+      const val = (rows[i][h] || '').trim();
+      if (val.startsWith('http')) {
+        if (val.includes('linkedin.com')) {
+          containsLinkedIn = true;
+        } else {
+          matches++;
+        }
       }
     }
-    if (matches > 0) {
+    if (matches > 0 && !containsLinkedIn) {
       websiteKey = h;
       break;
     }
   }
   
-  // 2. Guess based on header names if not found by scanning values
+  // 2. Guess based on header names if not found by scanning values, excluding linkedin headers
   if (!websiteKey) {
-    const webGuesses = ['yelp link', 'yelp url', 'yelp', 'yellow pages link', 'yellow pages', 'yellowpages', 'canada yellow pages', 'website', 'url', 'link'];
+    const webGuesses = ['website', 'url', 'link', 'yelp link', 'yelp url', 'yelp', 'yellow pages link', 'yellow pages', 'yellowpages', 'canada yellow pages'];
     for (const h of headers) {
-      if (webGuesses.includes(h.toLowerCase().trim())) {
+      const lowerH = h.toLowerCase().trim();
+      if (webGuesses.includes(lowerH) && !lowerH.includes('linkedin')) {
         websiteKey = h;
         break;
       }
@@ -672,14 +740,19 @@ function autoVerifyAndMap(headers, rows) {
   if (!websiteKey) {
     for (const h of headers) {
       let matches = 0;
+      let containsLinkedIn = false;
       const sampleCount = Math.min(rows.length, 5);
       for (let i = 0; i < sampleCount; i++) {
         const val = rows[i][h] || '';
         if (val.startsWith('http')) {
-          matches++;
+          if (val.includes('linkedin.com')) {
+            containsLinkedIn = true;
+          } else {
+            matches++;
+          }
         }
       }
-      if (matches > 0) {
+      if (matches > 0 && !containsLinkedIn) {
         websiteKey = h;
         break;
       }
