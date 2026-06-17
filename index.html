@@ -183,7 +183,7 @@
     color: var(--danger-text);
   }
   
-  main { max-width: 1240px; margin: 0 auto; padding: 32px 24px 80px; }
+  main { max-width: 100%; width: 100%; padding: 32px 24px 80px; }
   
   /* Stats Dashboard Grid */
   .stats-grid { 
@@ -651,6 +651,10 @@
       <option>Interested</option><option>Not Interested</option>
       <option>Callback Scheduled</option><option>Wrong Number</option>
     </select>
+    <select id="filter-employee" onchange="renderTable()" class="hidden">
+      <option value="">All Employees</option>
+      <option value="unassigned">Unassigned Leads</option>
+    </select>
     <select id="filter-city" onchange="renderTable()"><option value="">All Cities</option></select>
     <select id="filter-province" onchange="renderTable()"><option value="">All Provinces</option></select>
     <select id="sort-by" onchange="renderTable()">
@@ -672,7 +676,7 @@
     <table id="leads-table" style="display:none;">
       <thead>
         <tr>
-          <th>#</th><th>Business</th><th>Contact</th><th>Phone</th>
+          <th>#</th><th>Business</th><th>Website</th><th>Contact</th><th>Phone</th>
           <th>City</th><th>Province</th><th>Industry</th>
           <th>Status</th><th>Note</th><th>Assigned To</th><th>Updated</th><th>Actions</th>
         </tr>
@@ -893,11 +897,23 @@ onAuthStateChanged(auth, async (user) => {
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
       employees = usersSnap.docs.map(d => d.data()).filter(u => u.role === 'employee');
+      
+      const filterEmp = document.getElementById('filter-employee');
+      if (filterEmp) {
+        filterEmp.classList.remove('hidden');
+        filterEmp.innerHTML = '<option value="">All Employees</option>' +
+          '<option value="unassigned">Unassigned Leads</option>' +
+          employees.map(emp => '<option value="' + emp.uid + '">' + esc(emp.name) + '</option>').join('');
+      }
     } catch(err) {
       console.error("Error loading employees", err);
     }
   } else {
     document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
+    const filterEmp = document.getElementById('filter-employee');
+    if (filterEmp) {
+      filterEmp.classList.add('hidden');
+    }
   }
 
   let qLeads;
@@ -977,6 +993,7 @@ function renderPills() {
 function renderTable() {
   const q = document.getElementById('search').value.toLowerCase();
   const fStatus = document.getElementById('filter-status').value;
+  const fEmployee = document.getElementById('filter-employee') ? document.getElementById('filter-employee').value : '';
   const fCity = document.getElementById('filter-city').value;
   const fProv = document.getElementById('filter-province').value;
   const sortBy = document.getElementById('sort-by').value;
@@ -984,6 +1001,13 @@ function renderTable() {
   // Filter
   let filtered = leads.filter(l => {
     if (fStatus && l._status !== fStatus) return false;
+    if (userRole === 'admin' && fEmployee) {
+      if (fEmployee === 'unassigned') {
+        if (l.assignedTo) return false;
+      } else {
+        if (l.assignedTo !== fEmployee) return false;
+      }
+    }
     if (fCity && f(l,'city') !== fCity) return false;
     if (fProv && f(l,'province') !== fProv) return false;
     if (q) {
@@ -1035,7 +1059,7 @@ function renderTable() {
 
   const tbody = document.getElementById('tbody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match the current filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match the current filters.</td></tr>';
     mobileList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-hint);font-size:13.5px;width:100%;">No leads match the current filters.</div>';
     return;
   }
@@ -1046,6 +1070,7 @@ function renderTable() {
     const col = STATUS_COLORS[lead._status] || STATUS_COLORS['Not Called'];
     const phone = f(lead, 'phone');
     const bName = f(lead, 'businessName') || '—';
+    const webUrl = f(lead, 'website');
 
     let assignDropdown = '';
     if (userRole === 'admin') {
@@ -1060,6 +1085,7 @@ function renderTable() {
     return '<tr>' +
       '<td style="color:var(--text-hint);font-size:12px;">' + (idx + 1) + '</td>' +
       '<td style="font-weight:600;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(bName) + '">' + esc(bName) + '</td>' +
+      '<td style="white-space:nowrap;">' + (webUrl ? '<a href="' + esc(webUrl) + '" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500;">Link ↗</a>' : '—') + '</td>' +
       '<td style="white-space:nowrap;">' + esc(f(lead,'contactName') || '—') + '</td>' +
       '<td style="white-space:nowrap;"><a href="tel:' + esc(phone) + '" style="color:var(--accent);text-decoration:none;font-weight:500;">' + esc(phone || '—') + '</a></td>' +
       '<td style="white-space:nowrap;">' + esc(f(lead,'city') || '—') + '</td>' +
@@ -1085,6 +1111,8 @@ function renderTable() {
     const phone = f(lead, 'phone');
     const bName = f(lead, 'businessName') || '—';
     const cName = f(lead, 'contactName') || '—';
+    const webUrl = f(lead, 'website');
+    const websiteEl = webUrl ? '<div style="margin-top: 4px;"><a href="' + esc(webUrl) + '" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12.5px;font-weight:500;">Website ↗</a></div>' : '';
 
     let assignSelectMobile = '';
     if (userRole === 'admin') {
@@ -1105,7 +1133,8 @@ function renderTable() {
       '<div class="mobile-card-row">' +
         '<div>' +
           '<div class="mobile-business-name">' + esc(bName) + '</div>' +
-          '<div class="mobile-contact-name">' + esc(cName) + '</div>' +
+          websiteEl +
+          '<div class="mobile-contact-name" style="margin-top:2px;">' + esc(cName) + '</div>' +
         '</div>' +
         '<button class="btn-danger-icon" onclick="openDeleteModal(\'' + lead.id + '\', \'' + esc(bName).replace(/'/g, "\\'") + '\')">' +
           '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>' +
