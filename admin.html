@@ -623,6 +623,72 @@ window.handleFile = function(file) {
   reader.readAsText(file);
 };
 
+function autoVerifyAndMap(headers, rows) {
+  let businessKey = '';
+  let websiteKey = '';
+  
+  const linkRegex = /(yelp\.(com|ca)|yellowpages\.(ca|com)|yp\.ca)/i;
+  
+  // 1. Scan rows to find a column containing these URLs
+  for (const h of headers) {
+    let matches = 0;
+    const sampleCount = Math.min(rows.length, 5);
+    for (let i = 0; i < sampleCount; i++) {
+      const val = rows[i][h] || '';
+      if (val.startsWith('http') && linkRegex.test(val)) {
+        matches++;
+      }
+    }
+    if (matches > 0) {
+      websiteKey = h;
+      break;
+    }
+  }
+  
+  // 2. Guess based on header names if not found by scanning values
+  if (!websiteKey) {
+    const webGuesses = ['yelp link', 'yelp url', 'yelp', 'yellow pages link', 'yellow pages', 'yellowpages', 'canada yellow pages', 'website', 'url', 'link'];
+    for (const h of headers) {
+      if (webGuesses.includes(h.toLowerCase().trim())) {
+        websiteKey = h;
+        break;
+      }
+    }
+  }
+  
+  // 3. Find business name key
+  const busGuesses = ['business name', 'business', 'company', 'company name', 'salon name', 'name', 'organization'];
+  for (const h of headers) {
+    if (busGuesses.includes(h.toLowerCase().trim())) {
+      businessKey = h;
+      break;
+    }
+  }
+  
+  if (!businessKey && headers.length > 0) {
+    businessKey = headers[0];
+  }
+  
+  if (!websiteKey) {
+    for (const h of headers) {
+      let matches = 0;
+      const sampleCount = Math.min(rows.length, 5);
+      for (let i = 0; i < sampleCount; i++) {
+        const val = rows[i][h] || '';
+        if (val.startsWith('http')) {
+          matches++;
+        }
+      }
+      if (matches > 0) {
+        websiteKey = h;
+        break;
+      }
+    }
+  }
+  
+  return { businessKey, websiteKey };
+}
+
 function parseCSV(text) {
   const lines = text.trim().split(/\r?\n/);
   if (lines.length < 2) { showAlert('CSV appears empty.', 'danger'); return; }
@@ -637,7 +703,41 @@ function parseCSV(text) {
   }
   if (rawRows.length === 0) { showAlert('No data rows found.', 'danger'); return; }
   showAlert('', '');
-  showMappingUI();
+
+  // Perform automatic mapping & verification
+  const mappingResult = autoVerifyAndMap(rawHeaders, rawRows);
+  
+  if (mappingResult.businessKey) {
+    parsedLeads = rawRows.map(row => {
+      const lead = { _status: 'Not Called', _note: '', _updatedAt: '' };
+      lead.businessName = row[mappingResult.businessKey] || '';
+      if (mappingResult.websiteKey) {
+        lead.website = row[mappingResult.websiteKey] || '';
+      }
+      
+      // Auto-map all other keys if possible
+      TRACKER_FIELDS.forEach(f => {
+        if (f.key !== 'businessName' && f.key !== 'website') {
+          const guessedHeader = guessMapping(f.key);
+          if (guessedHeader && row[guessedHeader] !== undefined) {
+            lead[f.key] = row[guessedHeader] || '';
+          } else {
+            lead[f.key] = '';
+          }
+        }
+      });
+      return lead;
+    });
+
+    let verificationMsg = `✓ CSV automatically verified. Detected ${parsedLeads.length} leads.`;
+    if (mappingResult.websiteKey) {
+      verificationMsg += ` Link column "${mappingResult.websiteKey}" automatically mapped to Website section.`;
+    }
+    showAlert(verificationMsg, 'success');
+    renderPreview();
+  } else {
+    showMappingUI();
+  }
 }
 
 function splitLine(line) {
