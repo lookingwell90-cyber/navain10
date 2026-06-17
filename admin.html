@@ -334,17 +334,17 @@
   </div>
 
   <div class="card" id="employee-manager-card">
-    <div class="card-title">Employee Accounts Manager</div>
+    <div class="card-title">User Accounts Manager</div>
     <div style="display: flex; flex-direction: column; gap: 16px;">
       <div>
-        <h3 style="font-size: 13.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Active Employee Accounts</h3>
+        <h3 style="font-size: 13.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 8px;">Active Accounts</h3>
         <div id="employees-list" style="display: flex; flex-direction: column; gap: 8px;">
-          <p style="font-size: 13px; color: var(--text-hint);">Loading employees...</p>
+          <p style="font-size: 13px; color: var(--text-hint);">Loading accounts...</p>
         </div>
       </div>
       <hr style="border: none; border-top: 1px solid var(--border);">
       <form id="create-employee-form" onsubmit="createEmployee(event)">
-        <h3 style="font-size: 13.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px;">Create New Employee Account</h3>
+        <h3 style="font-size: 13.5px; font-weight: 600; color: var(--text-muted); margin-bottom: 12px;">Create New Account</h3>
         <div class="col-map" style="margin-top: 0; margin-bottom: 12px;">
           <div class="form-group">
             <label for="emp-name">Full Name</label>
@@ -354,14 +354,21 @@
             <label for="emp-email">Email Address</label>
             <input type="email" id="emp-email" required placeholder="john@navain.com">
           </div>
-          <div class="form-group" style="grid-column: span 2;">
+          <div class="form-group">
+            <label for="emp-role">Account Role</label>
+            <select id="emp-role" style="width: 100%; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg); color: var(--text); font-size: 13.5px; outline: none; cursor: pointer;">
+              <option value="employee">Employee</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label for="emp-password">Login Password (min 6 chars)</label>
             <input type="password" id="emp-password" required minlength="6" placeholder="••••••••">
           </div>
         </div>
         <button type="submit" class="btn btn-primary" style="margin-top: 4px;">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Create Employee Account
+          Create User Account
         </button>
       </form>
     </div>
@@ -539,7 +546,7 @@ window.logout = async () => {
 async function loadEmployees() {
   try {
     const snap = await getDocs(collection(db, 'users'));
-    employees = snap.docs.map(d => d.data()).filter(u => u.role === 'employee');
+    employees = snap.docs.map(d => d.data());
     const container = document.getElementById('employees-list');
     
     if (employees.length === 0) {
@@ -550,14 +557,24 @@ async function loadEmployees() {
     }
     
     container.innerHTML = employees.map(emp => {
+      const isSelf = currentUser && emp.uid === currentUser.uid;
+      const deleteButton = isSelf ? 
+        `<span style="font-size:11px;color:var(--text-hint);font-style:italic;white-space:nowrap;">Current User</span>` : 
+        `<button class="btn-danger-icon" onclick="deleteEmployee('${emp.uid}', '${esc(emp.name).replace(/'/g, "\\'")}')" title="Delete Account">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        </button>`;
+      
+      const roleColor = emp.role === 'admin' ? 'background:var(--s-wrong-bg);color:var(--s-wrong-text);' : 'background:var(--s-voicemail-bg);color:var(--s-voicemail-text);';
+      const roleText = emp.role === 'admin' ? 'Admin' : 'Employee';
+      const roleBadge = `<span class="badge" style="${roleColor}font-size:10px;padding:2px 8px;margin-left:8px;vertical-align:middle;">${roleText}</span>`;
+
       return `<div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-secondary); padding: 8px 12px; border-radius: var(--radius); border: 1px solid var(--border); font-size: 13.5px;">
         <div>
           <strong style="color: var(--text);">${esc(emp.name)}</strong>
-          <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px;">${esc(emp.email)}</span>
+          ${roleBadge}
+          <span style="color: var(--text-muted); font-size: 12px; margin-left: 8px; display:block; margin-top:2px;">${esc(emp.email)}</span>
         </div>
-        <button class="btn-danger-icon" onclick="deleteEmployee('${emp.uid}', '${esc(emp.name).replace(/'/g, "\\'")}')" title="Delete Account">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-        </button>
+        ${deleteButton}
       </div>`;
     }).join('');
     
@@ -587,11 +604,12 @@ window.createEmployee = async (e) => {
   const name = document.getElementById('emp-name').value.trim();
   const email = document.getElementById('emp-email').value.trim();
   const password = document.getElementById('emp-password').value;
+  const role = document.getElementById('emp-role').value;
 
-  if (!name || !email || !password) return;
+  if (!name || !email || !password || !role) return;
 
   try {
-    showToast("Creating employee account...");
+    showToast("Creating user account...");
     
     const appName = "Secondary_" + Math.random().toString(36).substring(7);
     const tempApp = initializeApp(firebaseConfig, appName);
@@ -604,18 +622,18 @@ window.createEmployee = async (e) => {
       uid: uid,
       name: name,
       email: email,
-      role: 'employee',
+      role: role,
       createdAt: new Date().toISOString()
     });
     
     await tempAuth.signOut();
     
     document.getElementById('create-employee-form').reset();
-    showToast("✓ Employee account created successfully");
+    showToast(`✓ ${role === 'admin' ? 'Admin' : 'Employee'} account created successfully`);
     await loadEmployees();
   } catch (err) {
     console.error(err);
-    showToast("Error creating employee: " + err.message);
+    showToast("Error creating account: " + err.message);
   }
 };
 
@@ -624,7 +642,7 @@ function populateCSVAssignDropdown() {
   if (!el) return;
   const currentVal = el.value;
   el.innerHTML = '<option value="">— Leave Unassigned —</option>' + 
-    employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)}</option>`).join('');
+    employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)} (${emp.role === 'admin' ? 'Admin' : 'Employee'})</option>`).join('');
   el.value = currentVal;
 }
 
@@ -632,8 +650,8 @@ function populateDeleteEmployeeLeadsDropdown() {
   const el = document.getElementById('delete-employee-leads-select');
   if (!el) return;
   const currentVal = el.value;
-  el.innerHTML = '<option value="">— Select Employee —</option>' + 
-    employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)}</option>`).join('');
+  el.innerHTML = '<option value="">— Select Account —</option>' + 
+    employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)} (${emp.role === 'admin' ? 'Admin' : 'Employee'})</option>`).join('');
   el.value = currentVal;
 }
 
