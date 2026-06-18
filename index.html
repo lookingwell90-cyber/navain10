@@ -59,6 +59,9 @@
       --s-wrong-bg: rgba(219, 39, 119, 0.15); --s-wrong-text: #fbcfe8;
     }
   }
+  html, body {
+    overflow-anchor: none;
+  }
   body { 
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
     background: var(--bg-tertiary); 
@@ -67,6 +70,7 @@
     transition: var(--transition);
   }
   header { 
+    overflow-anchor: none;
     background: rgba(255, 255, 255, 0.97); 
     border-bottom: 1px solid var(--border); 
     padding: 10px 24px; 
@@ -207,7 +211,7 @@
     color: var(--danger-text);
   }
   
-  main { max-width: 100%; width: 100%; padding: 32px 24px 80px; }
+  main { max-width: 100%; width: 100%; padding: 32px 24px 80px; overflow-anchor: none; }
   
   /* Stats Dashboard Grid */
   .stats-grid { 
