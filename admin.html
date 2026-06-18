@@ -320,11 +320,28 @@
   }
   .enrich-stat.success { background: var(--success-bg); color: var(--success-text); }
   .enrich-stat.fail { background: var(--danger-bg); color: var(--danger-text); }
+  .enrich-stat.skip { background: var(--bg-tertiary); color: var(--text-muted); }
   @keyframes enrichPulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }
   }
   .enriching { animation: enrichPulse 1.5s infinite; }
+  .proxy-config {
+    background: var(--bg-secondary); border: 1px solid var(--border-strong);
+    border-radius: var(--radius); padding: 14px 18px;
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+  }
+  .proxy-config label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+  .proxy-config input {
+    flex: 1; min-width: 240px; padding: 8px 12px;
+    border: 1px solid var(--border-strong); border-radius: var(--radius);
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none;
+  }
+  .proxy-config input:focus { border-color: var(--accent); }
+  .proxy-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .proxy-status.ok { background: var(--success-bg); color: var(--success-text); }
+  .proxy-status.err { background: var(--danger-bg); color: var(--danger-text); }
+  .proxy-status.idle { background: var(--bg-tertiary); color: var(--text-hint); }
    @media (max-width: 600px) { 
      .col-map { grid-template-columns: 1fr; } 
      main { padding: 24px 16px 60px; } 
@@ -352,6 +369,24 @@
 <main>
   <h1>Admin Portal</h1>
   <p class="subtitle">Upload dataset CSV files. Map your headers to tracker properties and instantly append new records.</p>
+
+  <!-- ── Enrichment Proxy Config ── -->
+  <div class="card">
+    <div class="card-title">Enrichment Proxy</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
+      Paste your deployed Vercel proxy URL. Yelp and Yellow Pages links will be enriched server-side.
+      Regular website links are stored as-is.
+    </p>
+    <div class="proxy-config">
+      <label>Proxy URL</label>
+      <input type="url" id="proxy-url" placeholder="https://navain-proxy.vercel.app" oninput="saveProxyUrl(this.value)" />
+      <span class="proxy-status idle" id="proxy-status">Not tested</span>
+      <button class="btn" onclick="testProxy()" style="white-space:nowrap;">Test Connection</button>
+    </div>
+    <p style="font-size:12px;color:var(--text-hint);margin-top:8px;">
+      Base URL only — no trailing slash. Example: <code>https://navain-proxy.vercel.app</code>
+    </p>
+  </div>
 
   <div class="card">
     <div class="card-title">Database Status</div>
@@ -449,17 +484,6 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
         Send to Employee
       </button>
-
-      <!-- Sent Tasks List -->
-      <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:18px;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-          <p style="font-size:13px;font-weight:700;color:var(--text);margin:0;">Sent Tasks</p>
-          <button onclick="loadAdminTasks()" style="font-size:12px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text-muted);cursor:pointer;">↻ Refresh</button>
-        </div>
-        <div id="admin-tasks-list" style="display:flex;flex-direction:column;gap:8px;">
-          <p style="font-size:13px;color:var(--text-hint);">Loading...</p>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -609,7 +633,6 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('clear-leads-btn').classList.remove('hidden');
     document.getElementById('csv-assignee-group').classList.remove('hidden');
     document.getElementById('assign-task-card').style.display = 'block';
-    loadAdminTasks();
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
@@ -782,7 +805,6 @@ window.sendTask = async function() {
     taskAlert(alertEl, `✓ Task sent to ${empName} successfully.`, 'success');
     setTimeout(() => taskAlert(alertEl, '', ''), 3500);
     showToast('✓ Task sent!');
-    loadAdminTasks();
   } catch(e) {
     taskAlert(alertEl, 'Error sending task: ' + e.message, 'danger');
   }
@@ -1070,189 +1092,116 @@ function renderPreview() {
   document.getElementById('preview-section').style.display = 'block';
 }
 
-// ========== AUTO-ENRICHMENT FROM LINKS ==========
+// ========== AUTO-ENRICHMENT VIA SERVER-SIDE PROXY ==========
 
-const CORS_PROXIES = [
-  url => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-  url => `https://corsproxy.io/?${encodeURIComponent(url)}`,
-  url => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`
-];
-
-async function fetchWithProxy(url) {
-  for (const makeProxy of CORS_PROXIES) {
-    try {
-      const proxyUrl = makeProxy(url);
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const resp = await fetch(proxyUrl, { signal: controller.signal });
-      clearTimeout(timeout);
-      if (resp.ok) {
-        const text = await resp.text();
-        if (text && text.length > 500) return text;
-      }
-    } catch (e) { /* try next proxy */ }
-  }
-  return null;
+function getProxyUrl() {
+  return (localStorage.getItem('navain_proxy_url') || '').replace(/\/$/, '');
 }
 
-function extractFromHTML(html, url) {
-  const info = { phone: '', city: '', province: '', industry: '' };
-  
+window.saveProxyUrl = function(val) {
+  localStorage.setItem('navain_proxy_url', val.trim().replace(/\/$/, ''));
+};
+
+window.testProxy = async function() {
+  const url = getProxyUrl();
+  const statusEl = document.getElementById('proxy-status');
+  if (!url) { statusEl.className = 'proxy-status err'; statusEl.textContent = 'Enter a URL first'; return; }
+  statusEl.className = 'proxy-status idle'; statusEl.textContent = 'Testing…';
   try {
-    // Try JSON-LD structured data first (most reliable)
-    const jsonLdMatches = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi);
-    if (jsonLdMatches) {
-      for (const match of jsonLdMatches) {
-        try {
-          const jsonStr = match.replace(/<script[^>]*>/i, '').replace(/<\/script>/i, '').trim();
-          const data = JSON.parse(jsonStr);
-          const biz = Array.isArray(data) ? data.find(d => d['@type'] && (d['@type'].includes('LocalBusiness') || d['@type'].includes('Organization') || d['@type'].includes('Restaurant') || d['@type'] === 'Store')) : data;
-          if (biz) {
-            if (biz.telephone && !info.phone) info.phone = biz.telephone;
-            if (biz.address) {
-              const addr = typeof biz.address === 'string' ? {} : biz.address;
-              if (addr.addressLocality && !info.city) info.city = addr.addressLocality;
-              if (addr.addressRegion && !info.province) info.province = addr.addressRegion;
-            }
-            if (biz.servesCuisine && !info.industry) info.industry = Array.isArray(biz.servesCuisine) ? biz.servesCuisine[0] : biz.servesCuisine;
-            if (biz.priceRange && !info.industry) info.industry = biz.priceRange;
-          }
-        } catch (e) { /* skip malformed JSON-LD */ }
-      }
-    }
+    const res = await fetch(url + '/api/enrich', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ url: 'https://example.com' })
+    });
+    if (res.ok) { statusEl.className = 'proxy-status ok'; statusEl.textContent = '✓ Connected'; }
+    else { statusEl.className = 'proxy-status err'; statusEl.textContent = 'HTTP ' + res.status; }
+  } catch (e) { statusEl.className = 'proxy-status err'; statusEl.textContent = 'Connection failed'; }
+};
 
-    // Parse as DOM for additional scraping
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(html, 'text/html');
-
-    // Yelp-specific selectors
-    if (url.includes('yelp.')) {
-      if (!info.phone) {
-        // Yelp phone patterns
-        const phoneMatch = html.match(/"phoneNumber"\s*:\s*"([^"]+)"/i) || html.match(/"phone"\s*:\s*"([^"]+)"/i);
-        if (phoneMatch) info.phone = phoneMatch[1];
-      }
-      if (!info.city) {
-        const cityMatch = html.match(/"addressLocality"\s*:\s*"([^"]+)"/i);
-        if (cityMatch) info.city = cityMatch[1];
-      }
-      if (!info.province) {
-        const provMatch = html.match(/"addressRegion"\s*:\s*"([^"]+)"/i);
-        if (provMatch) info.province = provMatch[1];
-      }
-      if (!info.industry) {
-        const catMatch = html.match(/"category"\s*:\s*"([^"]+)"/i) || html.match(/"categories"\s*:\s*\[\s*\{[^}]*"title"\s*:\s*"([^"]+)"/i);
-        if (catMatch) info.industry = catMatch[1] || catMatch[2];
-      }
-    }
-
-    // Yellow Pages Canada specific selectors
-    if (url.includes('yellowpages.ca') || url.includes('yp.ca')) {
-      if (!info.phone) {
-        const phoneEl = doc.querySelector('.mlr__item__phone, .jsMapBubblePhone, [class*="phone"]');
-        if (phoneEl) info.phone = phoneEl.textContent.trim();
-        if (!info.phone) {
-          const phoneMatch = html.match(/(\(\d{3}\)\s*\d{3}-\d{4})/) || html.match(/(\d{3}-\d{3}-\d{4})/);
-          if (phoneMatch) info.phone = phoneMatch[1];
-        }
-      }
-      if (!info.city) {
-        const cityEl = doc.querySelector('.mlr__item__locality, [class*="locality"]');
-        if (cityEl) {
-          const parts = cityEl.textContent.trim().split(',');
-          info.city = parts[0] ? parts[0].trim() : '';
-          if (parts[1] && !info.province) info.province = parts[1].trim();
-        }
-      }
-      if (!info.industry) {
-        const catEl = doc.querySelector('.mlr__item__cat, [class*="category"]');
-        if (catEl) info.industry = catEl.textContent.trim();
-      }
-    }
-
-    // Generic fallback: try common phone patterns from any HTML
-    if (!info.phone) {
-      const phoneRegex = /(?:tel:|"|>)\s*\+?1?\s*[\(]?(\d{3})[\)]?[\s.-]?(\d{3})[\s.-]?(\d{4})(?:["<])/;
-      const match = html.match(phoneRegex);
-      if (match) info.phone = `(${match[1]}) ${match[2]}-${match[3]}`;
-    }
-
-  } catch (e) {
-    console.warn('Enrichment parse error:', e);
-  }
-  
-  return info;
-}
+// Restore saved proxy URL on page load
+(function() {
+  const saved = localStorage.getItem('navain_proxy_url');
+  if (saved) { const el = document.getElementById('proxy-url'); if (el) el.value = saved; }
+})();
 
 async function fetchAndEnrichLeads(leadsWithLinks) {
+  const proxyBase = getProxyUrl();
   const container = document.getElementById('enrich-progress-container');
   const publishBtn = document.getElementById('publish-btn');
+
+  // Only enrich Yelp / Yellow Pages — regular sites just get stored as-is
+  const enrichable = leadsWithLinks.filter(l =>
+    l.website.includes('yelp.') || l.website.includes('yellowpages') || l.website.includes('yp.ca')
+  );
+
+  if (enrichable.length === 0) return; // nothing to enrich
+
+  if (!proxyBase) {
+    container.style.display = 'block';
+    container.innerHTML = `<div class="enrich-progress" style="border-color:rgba(185,28,28,.2);background:var(--danger-bg);color:var(--danger-text);">
+      ⚠️ <strong>No proxy URL configured.</strong> Paste your Vercel proxy URL in the "Enrichment Proxy" card above, then re-upload the CSV to enrich Yelp / Yellow Pages links.
+    </div>`;
+    return;
+  }
+
   container.style.display = 'block';
   publishBtn.disabled = true;
   publishBtn.style.opacity = '0.5';
-  
-  const total = leadsWithLinks.length;
-  let processed = 0;
-  let enriched = 0;
-  let failed = 0;
+
+  const total = enrichable.length;
+  let processed = 0, enriched = 0, failed = 0;
 
   container.innerHTML = `
     <div class="enrich-progress enriching">
-      <strong>🔍 Auto-Enrichment in Progress</strong><br>
-      <span id="enrich-status">Fetching business details from links… (0/${total})</span>
+      <strong>🔍 Enriching ${total} Yelp / Yellow Pages link${total !== 1 ? 's' : ''} via proxy…</strong><br>
+      <span id="enrich-status">Starting… (0/${total})</span>
       <div class="enrich-progress-bar"><div class="enrich-progress-bar-fill" id="enrich-bar"></div></div>
       <div id="enrich-stats" style="margin-top:6px;"></div>
     </div>`;
 
-  // Process leads in batches of 3 to avoid overwhelming proxies
-  const batchSize = 3;
-  for (let i = 0; i < leadsWithLinks.length; i += batchSize) {
-    const batch = leadsWithLinks.slice(i, i + batchSize);
-    const promises = batch.map(async (lead) => {
+  const BATCH = 5;
+  for (let i = 0; i < enrichable.length; i += BATCH) {
+    const batch = enrichable.slice(i, i + BATCH);
+    await Promise.all(batch.map(async (lead) => {
       try {
-        const html = await fetchWithProxy(lead.website);
-        if (html) {
-          const info = extractFromHTML(html, lead.website);
+        const res = await fetch(proxyBase + '/api/enrich', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: lead.website }),
+          signal: AbortSignal.timeout(15000)
+        });
+        if (!res.ok) { failed++; return; }
+        const data = await res.json();
+        if (!data.skip) {
           let didEnrich = false;
-          if (info.phone && !lead.phone) { lead.phone = info.phone; didEnrich = true; }
-          if (info.city && !lead.city) { lead.city = info.city; didEnrich = true; }
-          if (info.province && !lead.province) { lead.province = info.province; didEnrich = true; }
-          if (info.industry && !lead.industry) { lead.industry = info.industry; didEnrich = true; }
-          if (didEnrich) enriched++;
-          else failed++;
-        } else {
-          failed++;
-        }
-      } catch (e) {
-        failed++;
-      }
+          if (data.phone    && !lead.phone)    { lead.phone    = data.phone;    didEnrich = true; }
+          if (data.city     && !lead.city)     { lead.city     = data.city;     didEnrich = true; }
+          if (data.province && !lead.province) { lead.province = data.province; didEnrich = true; }
+          if (data.industry && !lead.industry) { lead.industry = data.industry; didEnrich = true; }
+          if (didEnrich) enriched++; else failed++;
+        } else { failed++; }
+      } catch (e) { failed++; }
+
       processed++;
       const pct = Math.round((processed / total) * 100);
       document.getElementById('enrich-bar').style.width = pct + '%';
-      document.getElementById('enrich-status').textContent = `Fetching business details from links… (${processed}/${total})`;
-      document.getElementById('enrich-stats').innerHTML = 
+      document.getElementById('enrich-status').textContent = `Processing… (${processed}/${total})`;
+      document.getElementById('enrich-stats').innerHTML =
         `<span class="enrich-stat success">✓ ${enriched} enriched</span>` +
-        `<span class="enrich-stat fail">✗ ${failed} skipped</span>`;
-    });
-    await Promise.all(promises);
+        `<span class="enrich-stat fail">✗ ${failed} failed</span>`;
+    }));
   }
 
-  // Final status
   container.innerHTML = `
-    <div class="enrich-progress" style="border-color: rgba(22, 163, 74, 0.2); background: var(--success-bg); color: var(--success-text);">
-      <strong>✓ Auto-Enrichment Complete</strong><br>
-      Processed ${total} links: <strong>${enriched}</strong> leads enriched with new data, <strong>${failed}</strong> skipped (blocked or no data found).
+    <div class="enrich-progress" style="border-color:rgba(22,163,74,.2);background:var(--success-bg);color:var(--success-text);">
+      <strong>✓ Enrichment Complete</strong> — ${enriched} leads enriched, ${failed} failed or returned no data.
     </div>`;
 
   publishBtn.disabled = false;
   publishBtn.style.opacity = '1';
-  
-  // Re-render the preview table with enriched data
   renderPreview();
-  // Keep the enrichment progress visible
   container.style.display = 'block';
 }
-
+  
 window.cancelPreview = function() {
   document.getElementById('preview-section').style.display = 'none';
   showMappingUI();
@@ -1325,68 +1274,6 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
 }
-
-// ===== SENT TASKS MANAGER =====
-const TASK_TYPE_ICON = { task: '📋', customer: '⭐', urgent: '🔴' };
-const TASK_TYPE_LABEL = { task: 'Task', customer: 'Special Customer', urgent: 'Urgent' };
-
-async function loadAdminTasks() {
-  const container = document.getElementById('admin-tasks-list');
-  if (!container) return;
-  container.innerHTML = '<p style="font-size:13px;color:var(--text-hint);">Loading...</p>';
-  try {
-    const snap = await getDocs(collection(db, 'tasks'));
-    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-    if (tasks.length === 0) {
-      container.innerHTML = '<p style="font-size:13px;color:var(--text-hint);">No tasks sent yet.</p>';
-      return;
-    }
-    container.innerHTML = tasks.map(task => {
-      const icon = TASK_TYPE_ICON[task.type] || '📋';
-      const label = TASK_TYPE_LABEL[task.type] || 'Task';
-      const date = task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' }) : '';
-      const readBadge = task.read
-        ? `<span style="font-size:11px;color:#16a34a;background:#f0fdf4;border:1px solid #bbf7d0;padding:2px 7px;border-radius:99px;">✓ Read</span>`
-        : `<span style="font-size:11px;color:var(--accent);background:var(--bg-secondary);border:1px solid var(--border);padding:2px 7px;border-radius:99px;">Unread</span>`;
-      return `<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 14px;">
-        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px;">
-              <span style="font-size:14px;">${icon}</span>
-              <span style="font-size:11.5px;color:var(--text-muted);background:var(--bg-secondary);padding:2px 7px;border-radius:99px;border:1px solid var(--border);">${label}</span>
-              <strong style="font-size:13px;color:var(--text);">${esc(task.title)}</strong>
-            </div>
-            <p style="font-size:12.5px;color:var(--text-muted);margin:0 0 6px;line-height:1.5;white-space:pre-wrap;">${esc(task.message)}</p>
-            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-              <span style="font-size:11.5px;color:var(--text-hint);">→ ${esc(task.assignedName || task.assignedTo)}</span>
-              <span style="font-size:11.5px;color:var(--text-hint);">${esc(date)}</span>
-              ${readBadge}
-            </div>
-          </div>
-          <button onclick="deleteTask('${task.id}')" title="Delete task" style="flex-shrink:0;padding:5px 10px;border:1px solid #fca5a5;border-radius:var(--radius);background:transparent;color:#dc2626;cursor:pointer;font-size:12px;display:flex;align-items:center;gap:4px;">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-            Delete
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-  } catch(e) {
-    container.innerHTML = `<p style="font-size:13px;color:#dc2626;">Error: ${e.message}</p>`;
-  }
-}
-window.loadAdminTasks = loadAdminTasks;
-
-window.deleteTask = async function(taskId) {
-  if (!confirm('Delete this task? The employee will no longer see it.')) return;
-  try {
-    await deleteDoc(doc(db, 'tasks', taskId));
-    showToast('Task deleted.');
-    loadAdminTasks();
-  } catch(e) {
-    showToast('Error: ' + e.message);
-  }
-};
 </script>
 </body>
 </html>
