@@ -107,6 +107,30 @@
   .logo-secondary .dot-sep {
     opacity: 0.6;
   }
+  .app-footer {
+    border-top: 1px solid var(--border);
+    padding: 20px 24px 28px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: center;
+    text-align: center;
+  }
+  .footer-contact {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .footer-contact .dot-sep {
+    opacity: 0.6;
+    font-weight: 400;
+  }
   @media (prefers-color-scheme: dark) {
     header {
       background: rgba(11, 15, 25, 0.97);
@@ -598,12 +622,6 @@
       Navain <span>AI</span> — Lead tracker
       <span class="live-dot" id="live-dot"><span class="live-label">Connecting…</span></span>
     </div>
-    <div class="logo-secondary primary-contact">
-      <span>Naveed Mughal</span><span class="dot-sep">•</span><span>CEO NAVAIN AI</span><span class="dot-sep">•</span><span>naveed.messi67@gmail.com</span><span class="dot-sep">•</span><span>0332-4106889</span>
-    </div>
-    <div class="logo-secondary primary-contact">
-      <span>Hunain Dilawar</span><span class="dot-sep">•</span><span>CFO Navain AI</span><span class="dot-sep">•</span><span>hunaindilawar40@gmail.com</span><span class="dot-sep">•</span><span>0339-1091002</span>
-    </div>
   </div>
   <div class="header-actions">
     <span id="user-display" style="font-size: 13px; font-weight: 600; color: var(--text-muted); margin-right: 8px;"></span>
@@ -757,6 +775,15 @@
   <!-- Mobile Card List View -->
   <div id="mobile-leads-list"></div>
 </main>
+
+<footer class="app-footer">
+  <div class="footer-contact">
+    <span>Naveed Mughal</span><span class="dot-sep">•</span><span>CEO NAVAIN AI</span><span class="dot-sep">•</span><span>naveed.messi67@gmail.com</span><span class="dot-sep">•</span><span>0332-4106889</span>
+  </div>
+  <div class="footer-contact">
+    <span>Hunain Dilawar</span><span class="dot-sep">•</span><span>CFO Navain AI</span><span class="dot-sep">•</span><span>hunaindilawar40@gmail.com</span><span class="dot-sep">•</span><span>0339-1091002</span>
+  </div>
+</footer>
 
 <!-- Add Lead Modal -->
 <div id="add-lead-modal" class="modal-overlay" onclick="if(event.target===this) closeAddLeadModal()">
