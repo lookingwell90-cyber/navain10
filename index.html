@@ -67,9 +67,7 @@
     transition: var(--transition);
   }
   header { 
-    background: rgba(255, 255, 255, 0.75); 
-    backdrop-filter: blur(12px); 
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(255, 255, 255, 0.97); 
     border-bottom: 1px solid var(--border); 
     padding: 10px 24px; 
     min-height: 64px; 
@@ -81,10 +79,6 @@
     z-index: 100; 
     flex-wrap: wrap;
     gap: 8px;
-    transform: translateZ(0);
-    -webkit-transform: translateZ(0);
-    will-change: transform;
-    isolation: isolate;
   }
   .logo-block {
     display: flex;
@@ -112,7 +106,7 @@
   }
   @media (prefers-color-scheme: dark) {
     header {
-      background: rgba(11, 15, 25, 0.75);
+      background: rgba(11, 15, 25, 0.97);
     }
   }
   .logo { 
