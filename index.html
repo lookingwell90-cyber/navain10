@@ -984,10 +984,18 @@ function renderDetailBody(lead) {
   `;
 }
 
-window.onDetailStatusChange = function(sel) {
+window.onDetailStatusChange = async function(sel) {
   const cbGroup = document.getElementById('detail-callback-group');
   if (sel.value === 'Callback Scheduled') cbGroup.style.display = '';
   else cbGroup.style.display = 'none';
+
+  if (!detailLeadId) return;
+  const updates = { _status: sel.value, _updatedAt: serverTimestamp() };
+  if (sel.value !== 'Callback Scheduled') updates._callbackDate = '';
+  try {
+    await updateDoc(doc(db,'leads',detailLeadId), updates);
+    showToast('Status updated');
+  } catch(e) { showToast('Failed to save status'); }
 };
 
 window.saveCallbackDate = async function(val) {
