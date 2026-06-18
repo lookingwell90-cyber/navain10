@@ -282,66 +282,6 @@
   }
   #mapping-section { display: none; }
   .hidden { display: none !important; }
-  .enrich-progress {
-    margin-top: 16px;
-    padding: 14px 18px;
-    background: var(--accent-bg);
-    border: 1px solid rgba(37, 99, 235, 0.15);
-    border-radius: var(--radius);
-    font-size: 13px;
-    color: var(--accent-text);
-    line-height: 1.5;
-  }
-  .enrich-progress-bar {
-    width: 100%;
-    height: 6px;
-    background: var(--bg-tertiary);
-    border-radius: 3px;
-    margin-top: 8px;
-    overflow: hidden;
-  }
-  .enrich-progress-bar-fill {
-    height: 100%;
-    background: var(--accent);
-    border-radius: 3px;
-    transition: width 0.3s ease;
-    width: 0%;
-  }
-  .enrich-stat {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-right: 6px;
-    margin-top: 6px;
-  }
-  .enrich-stat.success { background: var(--success-bg); color: var(--success-text); }
-  .enrich-stat.fail { background: var(--danger-bg); color: var(--danger-text); }
-  .enrich-stat.skip { background: var(--bg-tertiary); color: var(--text-muted); }
-  @keyframes enrichPulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.6; }
-  }
-  .enriching { animation: enrichPulse 1.5s infinite; }
-  .proxy-config {
-    background: var(--bg-secondary); border: 1px solid var(--border-strong);
-    border-radius: var(--radius); padding: 14px 18px;
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  }
-  .proxy-config label { font-size: 12.5px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
-  .proxy-config input {
-    flex: 1; min-width: 240px; padding: 8px 12px;
-    border: 1px solid var(--border-strong); border-radius: var(--radius);
-    background: var(--bg); color: var(--text); font-size: 13px; outline: none;
-  }
-  .proxy-config input:focus { border-color: var(--accent); }
-  .proxy-status { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
-  .proxy-status.ok { background: var(--success-bg); color: var(--success-text); }
-  .proxy-status.err { background: var(--danger-bg); color: var(--danger-text); }
-  .proxy-status.idle { background: var(--bg-tertiary); color: var(--text-hint); }
    @media (max-width: 600px) { 
      .col-map { grid-template-columns: 1fr; } 
      main { padding: 24px 16px 60px; } 
@@ -369,24 +309,6 @@
 <main>
   <h1>Admin Portal</h1>
   <p class="subtitle">Upload dataset CSV files. Map your headers to tracker properties and instantly append new records.</p>
-
-  <!-- ── Enrichment Proxy Config ── -->
-  <div class="card">
-    <div class="card-title">Enrichment Proxy</div>
-    <p style="font-size:13px;color:var(--text-muted);margin-bottom:14px;">
-      Paste your deployed Vercel proxy URL. Yelp and Yellow Pages links will be enriched server-side.
-      Regular website links are stored as-is.
-    </p>
-    <div class="proxy-config">
-      <label>Proxy URL</label>
-      <input type="url" id="proxy-url" placeholder="https://navain-proxy.vercel.app" oninput="saveProxyUrl(this.value)" />
-      <span class="proxy-status idle" id="proxy-status">Not tested</span>
-      <button class="btn" onclick="testProxy()" style="white-space:nowrap;">Test Connection</button>
-    </div>
-    <p style="font-size:12px;color:var(--text-hint);margin-top:8px;">
-      Base URL only — no trailing slash. Example: <code>https://navain-proxy.vercel.app</code>
-    </p>
-  </div>
 
   <div class="card">
     <div class="card-title">Database Status</div>
@@ -526,7 +448,6 @@
   <!-- Preview Section -->
   <div class="card" id="preview-section">
     <div class="card-title">Dataset Preview <span class="count-badge" id="preview-count">0 leads</span></div>
-    <div id="enrich-progress-container" style="display:none;"></div>
     <div class="preview-table-wrap">
       <table id="preview-table">
         <thead id="preview-head"></thead>
@@ -994,16 +915,10 @@ function parseCSV(text) {
 
     let verificationMsg = `✓ CSV automatically verified. Detected ${parsedLeads.length} leads.`;
     if (mappingResult.websiteKey) {
-      verificationMsg += ` Link column "${mappingResult.websiteKey}" automatically mapped to Website section.`;
+      verificationMsg += ` Link column "${mappingResult.websiteKey}" mapped to Website field.`;
     }
     showAlert(verificationMsg, 'success');
     renderPreview();
-
-    // Auto-enrich leads from links
-    const leadsWithLinks = parsedLeads.filter(l => l.website && l.website.startsWith('http'));
-    if (leadsWithLinks.length > 0) {
-      fetchAndEnrichLeads(leadsWithLinks);
-    }
   } else {
     showMappingUI();
   }
@@ -1092,116 +1007,8 @@ function renderPreview() {
   document.getElementById('preview-section').style.display = 'block';
 }
 
-// ========== AUTO-ENRICHMENT VIA SERVER-SIDE PROXY ==========
 
-function getProxyUrl() {
-  return (localStorage.getItem('navain_proxy_url') || '').replace(/\/$/, '');
-}
 
-window.saveProxyUrl = function(val) {
-  localStorage.setItem('navain_proxy_url', val.trim().replace(/\/$/, ''));
-};
-
-window.testProxy = async function() {
-  const url = getProxyUrl();
-  const statusEl = document.getElementById('proxy-status');
-  if (!url) { statusEl.className = 'proxy-status err'; statusEl.textContent = 'Enter a URL first'; return; }
-  statusEl.className = 'proxy-status idle'; statusEl.textContent = 'Testing…';
-  try {
-    const res = await fetch(url + '/api/enrich', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: 'https://example.com' })
-    });
-    if (res.ok) { statusEl.className = 'proxy-status ok'; statusEl.textContent = '✓ Connected'; }
-    else { statusEl.className = 'proxy-status err'; statusEl.textContent = 'HTTP ' + res.status; }
-  } catch (e) { statusEl.className = 'proxy-status err'; statusEl.textContent = 'Connection failed'; }
-};
-
-// Restore saved proxy URL on page load
-(function() {
-  const saved = localStorage.getItem('navain_proxy_url');
-  if (saved) { const el = document.getElementById('proxy-url'); if (el) el.value = saved; }
-})();
-
-async function fetchAndEnrichLeads(leadsWithLinks) {
-  const proxyBase = getProxyUrl();
-  const container = document.getElementById('enrich-progress-container');
-  const publishBtn = document.getElementById('publish-btn');
-
-  // Only enrich Yelp / Yellow Pages — regular sites just get stored as-is
-  const enrichable = leadsWithLinks.filter(l =>
-    l.website.includes('yelp.') || l.website.includes('yellowpages') || l.website.includes('yp.ca')
-  );
-
-  if (enrichable.length === 0) return; // nothing to enrich
-
-  if (!proxyBase) {
-    container.style.display = 'block';
-    container.innerHTML = `<div class="enrich-progress" style="border-color:rgba(185,28,28,.2);background:var(--danger-bg);color:var(--danger-text);">
-      ⚠️ <strong>No proxy URL configured.</strong> Paste your Vercel proxy URL in the "Enrichment Proxy" card above, then re-upload the CSV to enrich Yelp / Yellow Pages links.
-    </div>`;
-    return;
-  }
-
-  container.style.display = 'block';
-  publishBtn.disabled = true;
-  publishBtn.style.opacity = '0.5';
-
-  const total = enrichable.length;
-  let processed = 0, enriched = 0, failed = 0;
-
-  container.innerHTML = `
-    <div class="enrich-progress enriching">
-      <strong>🔍 Enriching ${total} Yelp / Yellow Pages link${total !== 1 ? 's' : ''} via proxy…</strong><br>
-      <span id="enrich-status">Starting… (0/${total})</span>
-      <div class="enrich-progress-bar"><div class="enrich-progress-bar-fill" id="enrich-bar"></div></div>
-      <div id="enrich-stats" style="margin-top:6px;"></div>
-    </div>`;
-
-  const BATCH = 5;
-  for (let i = 0; i < enrichable.length; i += BATCH) {
-    const batch = enrichable.slice(i, i + BATCH);
-    await Promise.all(batch.map(async (lead) => {
-      try {
-        const res = await fetch(proxyBase + '/api/enrich', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ url: lead.website }),
-          signal: AbortSignal.timeout(15000)
-        });
-        if (!res.ok) { failed++; return; }
-        const data = await res.json();
-        if (!data.skip) {
-          let didEnrich = false;
-          if (data.phone    && !lead.phone)    { lead.phone    = data.phone;    didEnrich = true; }
-          if (data.city     && !lead.city)     { lead.city     = data.city;     didEnrich = true; }
-          if (data.province && !lead.province) { lead.province = data.province; didEnrich = true; }
-          if (data.industry && !lead.industry) { lead.industry = data.industry; didEnrich = true; }
-          if (didEnrich) enriched++; else failed++;
-        } else { failed++; }
-      } catch (e) { failed++; }
-
-      processed++;
-      const pct = Math.round((processed / total) * 100);
-      document.getElementById('enrich-bar').style.width = pct + '%';
-      document.getElementById('enrich-status').textContent = `Processing… (${processed}/${total})`;
-      document.getElementById('enrich-stats').innerHTML =
-        `<span class="enrich-stat success">✓ ${enriched} enriched</span>` +
-        `<span class="enrich-stat fail">✗ ${failed} failed</span>`;
-    }));
-  }
-
-  container.innerHTML = `
-    <div class="enrich-progress" style="border-color:rgba(22,163,74,.2);background:var(--success-bg);color:var(--success-text);">
-      <strong>✓ Enrichment Complete</strong> — ${enriched} leads enriched, ${failed} failed or returned no data.
-    </div>`;
-
-  publishBtn.disabled = false;
-  publishBtn.style.opacity = '1';
-  renderPreview();
-  container.style.display = 'block';
-}
-  
 window.cancelPreview = function() {
   document.getElementById('preview-section').style.display = 'none';
   showMappingUI();
