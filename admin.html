@@ -417,6 +417,41 @@
     </div>
   </div>
 
+  <!-- Assign Task / Special Customer Card -->
+  <div class="card" id="assign-task-card" style="display:none;">
+    <div class="card-title">Assign Task or Special Customer</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Send a task, instruction, or special customer note directly to an employee. It will appear as a pinned alert in their portal.</p>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div class="form-group">
+        <label for="task-employee" style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Assign To</label>
+        <select id="task-employee" style="width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;cursor:pointer;margin-top:6px;">
+          <option value="">— Select Employee —</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="task-type" style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Type</label>
+        <select id="task-type" style="width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;cursor:pointer;margin-top:6px;">
+          <option value="task">📋 Task / Instruction</option>
+          <option value="customer">⭐ Special Customer</option>
+          <option value="urgent">🔴 Urgent Alert</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="task-title" style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Title</label>
+        <input type="text" id="task-title" placeholder="e.g. Follow up with Johnson Dental" style="width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;margin-top:6px;">
+      </div>
+      <div class="form-group">
+        <label for="task-message" style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Message / Details</label>
+        <textarea id="task-message" rows="4" placeholder="Provide full details here..." style="width:100%;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;resize:vertical;box-sizing:border-box;margin-top:6px;font-family:inherit;"></textarea>
+      </div>
+      <div id="task-alert" style="min-height:20px;"></div>
+      <button class="btn btn-primary" onclick="sendTask()" style="align-self:flex-start;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="margin-right:6px;"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send to Employee
+      </button>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Upload Dataset</div>
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
@@ -480,7 +515,7 @@
 
 <script type="module">
 import { db, auth, firebaseConfig } from './firebase-init.js';
-import { collection, getDocs, setDoc, deleteDoc, doc, writeBatch, query, where } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, getDocs, setDoc, deleteDoc, doc, writeBatch, query, where, addDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import { getAuth, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
@@ -562,6 +597,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('employee-manager-card').classList.remove('hidden');
     document.getElementById('clear-leads-btn').classList.remove('hidden');
     document.getElementById('csv-assignee-group').classList.remove('hidden');
+    document.getElementById('assign-task-card').style.display = 'block';
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
@@ -569,6 +605,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('employee-manager-card').classList.add('hidden');
     document.getElementById('clear-leads-btn').classList.add('hidden');
     document.getElementById('csv-assignee-group').classList.add('hidden');
+    document.getElementById('assign-task-card').style.display = 'none';
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.add('hidden');
   }
@@ -597,6 +634,7 @@ async function loadEmployees() {
       container.innerHTML = '<p style="font-size: 13px; color: var(--text-hint);">No employees registered yet.</p>';
       populateCSVAssignDropdown();
       populateDeleteEmployeeLeadsDropdown();
+      populateTaskEmployeeDropdown();
       return;
     }
     
@@ -624,6 +662,7 @@ async function loadEmployees() {
     
     populateCSVAssignDropdown();
     populateDeleteEmployeeLeadsDropdown();
+    populateTaskEmployeeDropdown();
   } catch (err) {
     console.error("Error loading employees", err);
     document.getElementById('employees-list').innerHTML = '<p style="font-size: 13px; color: var(--danger-text);">Error loading employees.</p>';
@@ -688,6 +727,60 @@ function populateCSVAssignDropdown() {
   el.innerHTML = '<option value="">— Leave Unassigned —</option>' + 
     employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)} (${emp.role === 'admin' ? 'Admin' : 'Employee'})</option>`).join('');
   el.value = currentVal;
+}
+
+function populateTaskEmployeeDropdown() {
+  const el = document.getElementById('task-employee');
+  if (!el) return;
+  const onlyEmployees = employees.filter(e => e.role !== 'admin');
+  el.innerHTML = '<option value="">— Select Employee —</option>' +
+    onlyEmployees.map(emp => `<option value="${emp.uid}">${esc(emp.name)}</option>`).join('');
+}
+
+window.sendTask = async function() {
+  const empId = document.getElementById('task-employee').value;
+  const title = document.getElementById('task-title').value.trim();
+  const message = document.getElementById('task-message').value.trim();
+  const type = document.getElementById('task-type').value;
+  const alertEl = document.getElementById('task-alert');
+
+  if (!empId) { taskAlert(alertEl, 'Please select an employee.', 'danger'); return; }
+  if (!title) { taskAlert(alertEl, 'Please enter a title.', 'danger'); return; }
+  if (!message) { taskAlert(alertEl, 'Please enter a message.', 'danger'); return; }
+
+  const emp = employees.find(e => e.uid === empId);
+  const empName = emp ? emp.name : '';
+  const senderName = localStorage.getItem('user_name') || 'Admin';
+
+  try {
+    taskAlert(alertEl, 'Sending...', 'info');
+    await addDoc(collection(db, 'tasks'), {
+      assignedTo: empId,
+      assignedName: empName,
+      sentBy: senderName,
+      type,
+      title,
+      message,
+      read: false,
+      createdAt: new Date().toISOString()
+    });
+    document.getElementById('task-title').value = '';
+    document.getElementById('task-message').value = '';
+    document.getElementById('task-employee').value = '';
+    taskAlert(alertEl, `✓ Task sent to ${empName} successfully.`, 'success');
+    setTimeout(() => taskAlert(alertEl, '', ''), 3500);
+    showToast('✓ Task sent!');
+  } catch(e) {
+    taskAlert(alertEl, 'Error sending task: ' + e.message, 'danger');
+  }
+};
+
+function taskAlert(el, msg, type) {
+  const colors = { success:'#16a34a', danger:'#dc2626', info:'var(--accent)' };
+  const bgs = { success:'#f0fdf4', danger:'#fef2f2', info:'var(--bg-secondary)' };
+  el.innerHTML = msg
+    ? `<div style="padding:8px 12px;border-radius:var(--radius);border:1px solid ${colors[type]||'var(--border)'};background:${bgs[type]||'var(--bg-secondary)'};color:${colors[type]||'var(--text)'};font-size:13px;">${msg}</div>`
+    : '';
 }
 
 function populateDeleteEmployeeLeadsDropdown() {
