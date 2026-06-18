@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "api/enrich.js": {
+      "runtime": "nodejs20.x"
+    }
+  }
+}
