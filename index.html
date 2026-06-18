@@ -738,7 +738,9 @@ window.renderTable = function() {
     const webUrl = f(lead,'website');
     const cs = callbackStatus(lead);
     const cbBadge = cs === 'overdue' ? '<span class="overdue-badge">⚠ Overdue</span>' : cs === 'today' ? '<span class="due-today-badge">📅 Today</span>' : '';
-    const cbDisplay = lead._callbackDate ? formatDate(lead._callbackDate) + cbBadge : '—';
+    const cbCell = lead._status === 'Callback Scheduled'
+      ? '<input type="date" class="callback-date-input" style="margin-top:0;padding:5px 7px;font-size:12px;width:128px;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)">' + (cbBadge?'<div style="margin-top:3px;">'+cbBadge+'</div>':'')
+      : '<span style="color:var(--text-hint);">—</span>';
     const isSelected = selectedLeadIds.has(lead.id);
 
     let assignCell = '';
@@ -764,7 +766,7 @@ window.renderTable = function() {
       '<td><select class="status-select" data-id="'+lead.id+'" onchange="updateStatus(this)" style="background:'+col.bg+';color:'+col.text+';border-color:transparent;">'+
         STATUSES.map(s=>'<option'+(lead._status===s?' selected':'')+'>'+s+'</option>').join('') +
       '</select></td>' +
-      '<td style="white-space:nowrap;font-size:12px;">'+cbDisplay+'</td>' +
+      '<td style="white-space:nowrap;font-size:12px;">'+cbCell+'</td>' +
       '<td><input class="note-input" type="text" placeholder="Add note…" value="'+esc(lead._note||'')+'" data-id="'+lead.id+'" oninput="updateNote(this)" maxlength="200"></td>' +
       assignCell +
       '<td class="updated-at">'+(lead._updatedAt?formatTime(lead._updatedAt):'')+'</td>' +
@@ -795,7 +797,7 @@ window.renderTable = function() {
         '<select class="status-select" data-id="'+lead.id+'" onchange="updateStatus(this)" style="background:'+col.bg+';color:'+col.text+';border-color:transparent;">'+
           STATUSES.map(s=>'<option'+(lead._status===s?' selected':'')+'>'+s+'</option>').join('')+'</select>' +
       '</div>' +
-      (lead._callbackDate?'<div style="font-size:12px;margin-top:6px;color:var(--text-muted);">Callback: '+formatDate(lead._callbackDate)+cbBadge+'</div>':'') +
+      (lead._status==='Callback Scheduled'?'<div style="margin-top:6px;"><label style="font-size:11px;color:var(--text-muted);">Callback Date</label><input type="date" class="callback-date-input" style="margin-top:3px;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)">'+(cbBadge?'<div style="margin-top:4px;">'+cbBadge+'</div>':'')+'</div>':'') +
       '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">' +
         '<input class="note-input" type="text" placeholder="Add note…" value="'+esc(lead._note||'')+'" data-id="'+lead.id+'" oninput="updateNote(this)" maxlength="200" style="max-width:100%;">' +
       '</div>' +
@@ -810,8 +812,21 @@ window.updateStatus = async function(sel) {
   sel.style.background = col.bg; sel.style.color = col.text;
   const updates = {_status: sel.value, _updatedAt: serverTimestamp()};
   if (sel.value !== 'Callback Scheduled') updates._callbackDate = '';
-  try { await updateDoc(doc(db,'leads',id), updates); showToast('Status updated'); }
+  try {
+    await updateDoc(doc(db,'leads',id), updates);
+    showToast(sel.value === 'Callback Scheduled' ? 'Status updated — set the callback date →' : 'Status updated');
+  }
   catch(e) { showToast('Failed to save'); }
+};
+
+// ── Callback date inline edit (table/mobile row)
+window.updateCallbackDateInline = async function(input) {
+  const id = input.dataset.id;
+  if (!input.value) { showToast('Pick a date'); return; }
+  try {
+    await updateDoc(doc(db,'leads',id), {_callbackDate: input.value, _updatedAt: serverTimestamp()});
+    showToast('✓ Callback date saved');
+  } catch(e) { showToast('Failed to save callback date'); }
 };
 
 // ── Note update
