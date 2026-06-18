@@ -71,14 +71,40 @@
     backdrop-filter: blur(12px); 
     -webkit-backdrop-filter: blur(12px);
     border-bottom: 1px solid var(--border); 
-    padding: 0 24px; 
-    height: 64px; 
+    padding: 10px 24px; 
+    min-height: 64px; 
     display: flex; 
     align-items: center; 
     justify-content: space-between; 
     position: sticky; 
     top: 0; 
     z-index: 100; 
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .logo-block {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+  }
+  .logo-secondary {
+    font-family: 'Inter', sans-serif;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-hint);
+    letter-spacing: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .logo-secondary.primary-contact {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+  .logo-secondary .dot-sep {
+    opacity: 0.6;
   }
   @media (prefers-color-scheme: dark) {
     header {
@@ -566,9 +592,17 @@
 </head>
 <body>
 <header>
-  <div class="logo">
-    Navain <span>AI</span> — Lead tracker
-    <span class="live-dot" id="live-dot"><span class="live-label">Connecting…</span></span>
+  <div class="logo-block">
+    <div class="logo">
+      Navain <span>AI</span> — Lead tracker
+      <span class="live-dot" id="live-dot"><span class="live-label">Connecting…</span></span>
+    </div>
+    <div class="logo-secondary primary-contact">
+      <span>Naveed Mughal</span><span class="dot-sep">•</span><span>CEO NAVAIN AI</span><span class="dot-sep">•</span><span>naveed.messi67@gmail.com</span><span class="dot-sep">•</span><span>0332-4106889</span>
+    </div>
+    <div class="logo-secondary primary-contact">
+      <span>Hunain Dilawar</span><span class="dot-sep">•</span><span>CFO Navain AI</span><span class="dot-sep">•</span><span>hunaindilawar40@gmail.com</span><span class="dot-sep">•</span><span>0339-1091002</span>
+    </div>
   </div>
   <div class="header-actions">
     <span id="user-display" style="font-size: 13px; font-weight: 600; color: var(--text-muted); margin-right: 8px;"></span>
@@ -640,7 +674,7 @@
   </div>
 
   <!-- Tasks Inbox (Employee only) -->
-  <div id="tasks-inbox" style="display:none;margin-top:20px;">
+  <div id="tasks-inbox" style="margin-top:20px;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
       <h2 style="font-size:16px;font-weight:700;color:var(--text);margin:0;">📬 Messages from Admin</h2>
       <span id="tasks-unread-badge" style="display:none;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;"></span>
@@ -651,7 +685,7 @@
   </div>
 
   <!-- Support Contact Banner (Employee only) -->
-  <div id="support-banner" style="display:none;margin-top:16px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:var(--bg-card);">
+  <div id="support-banner" style="margin-top:16px;margin-bottom:4px;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:var(--bg-card);">
     <div style="display:flex;align-items:flex-start;gap:12px;">
       <div style="flex-shrink:0;width:36px;height:36px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.14 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.15 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.09 9.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21 16.92z"/></svg>
@@ -1006,9 +1040,10 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   // Show support banner and tasks inbox for non-admins
-  if (userRole !== 'admin') {
-    document.getElementById('support-banner').style.display = 'block';
-    document.getElementById('tasks-inbox').style.display = 'block';
+  if (userRole === 'admin') {
+    document.getElementById('support-banner').style.display = 'none';
+    document.getElementById('tasks-inbox').style.display = 'none';
+  } else {
     loadEmployeeTasks(user.uid);
   }
 
