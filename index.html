@@ -220,9 +220,13 @@ tr:hover td{background:var(--bg-secondary);}
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       <span class="btn-label">Add Lead</span>
     </button>
+    <select id="export-employee-select" class="hidden" onchange="updateExportLabel()" style="padding:7px 10px;font-size:12.5px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;max-width:160px;">
+      <option value="">Export: All Leads</option>
+      <option value="unassigned">Export: Unassigned</option>
+    </select>
     <button class="btn" onclick="exportCSV()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      <span class="btn-label">Export</span>
+      <span class="btn-label" id="export-btn-label">Export</span>
     </button>
     <a class="btn btn-accent hidden" id="admin-portal-btn" href="admin.html" onclick="handlePortalBtnClick(event)">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -528,6 +532,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('admin-portal-btn-label').textContent = 'Admin Portal';
     document.getElementById('admin-portal-btn').classList.remove('hidden');
     document.getElementById('filter-employee').classList.remove('hidden');
+    document.getElementById('export-employee-select').classList.remove('hidden');
     document.getElementById('support-banner').style.display = 'none';
     document.getElementById('tasks-inbox').style.display = 'none';
     document.getElementById('perf-section').style.display = 'block';
@@ -541,6 +546,9 @@ onAuthStateChanged(auth, async (user) => {
       const bulkSel = document.getElementById('bulk-reassign-select');
       bulkSel.innerHTML = '<option value="">Reassign to…</option>' +
         employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+'</option>').join('');
+      const exportEmp = document.getElementById('export-employee-select');
+      exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
+        employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
     } catch(err) { console.error(err); }
   } else {
     document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
@@ -941,9 +949,13 @@ function renderDetailBody(lead) {
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;">
         <div class="form-group" style="min-width:160px;">
           <label>Outcome</label>
-          <select id="log-outcome" style="padding:8px 12px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;">
+          <select id="log-outcome" onchange="onLogOutcomeChange(this)" style="padding:8px 12px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;">
             ${STATUSES.filter(s=>s!=='Not Called').map(s=>'<option>'+s+'</option>').join('')}
           </select>
+        </div>
+        <div class="form-group" id="log-callback-date-group" style="display:none;min-width:160px;">
+          <label>Callback Date</label>
+          <input type="date" id="log-callback-date" class="callback-date-input" value="${lead._callbackDate||''}">
         </div>
         <div class="form-group" style="flex:1;min-width:180px;">
           <label>Call Note</label>
@@ -999,6 +1011,11 @@ function renderDetailBody(lead) {
     </div>
   `;
 }
+
+window.onLogOutcomeChange = function(sel) {
+  const grp = document.getElementById('log-callback-date-group');
+  grp.style.display = sel.value === 'Callback Scheduled' ? '' : 'none';
+};
 
 window.onDetailStatusChange = async function(sel) {
   const cbGroup = document.getElementById('detail-callback-group');
@@ -1056,14 +1073,21 @@ window.logCall = async function(id) {
   const newLog = [...existingLog, entry];
 
   const updates = { _callLog: newLog, _status: outcome, _updatedAt: serverTimestamp() };
-  if (outcome !== 'Callback Scheduled') updates._callbackDate = '';
+  if (outcome === 'Callback Scheduled') {
+    const cbDateEl = document.getElementById('log-callback-date');
+    const cbDate = cbDateEl ? cbDateEl.value : '';
+    if (!cbDate) { showToast('Please pick a callback date'); return; }
+    updates._callbackDate = cbDate;
+  } else {
+    updates._callbackDate = '';
+  }
 
   try {
     await updateDoc(doc(db,'leads',id), updates);
     document.getElementById('log-note').value = '';
     showToast('✓ Call logged');
     // Re-render detail with updated lead (onSnapshot will update leads[] but we can update locally too)
-    const updatedLead = {...lead, _callLog: newLog, _status: outcome};
+    const updatedLead = {...lead, _callLog: newLog, _status: outcome, _callbackDate: updates._callbackDate};
     renderDetailBody(updatedLead);
   } catch(e) { showToast('Error logging call'); }
 };
@@ -1126,12 +1150,27 @@ document.getElementById('confirm-delete-btn').onclick = async () => {
   catch(err) { showToast('Error deleting lead'); }
 };
 
-// ── Export (respects active filters)
+// ── Export (respects active filters + dedicated employee-export selector)
+window.updateExportLabel = function() {
+  const sel = document.getElementById('export-employee-select');
+  const label = document.getElementById('export-btn-label');
+  if (!sel || !label) return;
+  if (!sel.value) { label.textContent = 'Export'; return; }
+  if (sel.value === 'unassigned') { label.textContent = 'Export (Unassigned)'; return; }
+  const emp = employees.find(e => e.uid === sel.value);
+  label.textContent = 'Export (' + (emp ? emp.name : '1 agent') + ')';
+};
+
 window.exportCSV = function() {
   // Re-run filter logic to get currently visible leads
   const q = document.getElementById('search').value.toLowerCase();
   const fStatus = document.getElementById('filter-status').value;
-  const fEmployee = document.getElementById('filter-employee') ? document.getElementById('filter-employee').value : '';
+  const exportEmpSel = document.getElementById('export-employee-select');
+  // Dedicated export-employee selector takes priority over the table's employee filter,
+  // so admin can export for a specific employee without changing what's shown on screen.
+  const fEmployee = (exportEmpSel && exportEmpSel.value)
+    ? exportEmpSel.value
+    : (document.getElementById('filter-employee') ? document.getElementById('filter-employee').value : '');
   const fCity = document.getElementById('filter-city').value;
   const fProv = document.getElementById('filter-province').value;
   const fNiche = document.getElementById('filter-niche').value;
@@ -1165,11 +1204,17 @@ window.exportCSV = function() {
     q2(f(l,'city')), q2(f(l,'province')), q2(f(l,'industry')), q2(f(l,'website')),
     q2(l._status), q2(l._callbackDate||''), q2(l._note||''), q2(l.assignedName||'')
   ].join(',')));
+  let nameSuffix = '';
+  if (fEmployee === 'unassigned') nameSuffix = '-unassigned';
+  else if (fEmployee) {
+    const emp = employees.find(e => e.uid === fEmployee);
+    nameSuffix = '-' + (emp ? emp.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') : 'agent');
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob([rows.join('\n')], {type:'text/csv'}));
-  a.download = 'navain-leads-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.download = 'navain-leads' + nameSuffix + '-' + new Date().toISOString().slice(0,10) + '.csv';
   a.click();
-  showToast('✓ Exported ' + filtered.length + ' leads');
+  showToast('✓ Exported ' + filtered.length + ' leads' + (nameSuffix ? ' for ' + nameSuffix.slice(1).replace(/-/g,' ') : ''));
 };
 function q2(v) { return '"' + String(v||'').replace(/"/g,'""') + '"'; }
 
