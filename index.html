@@ -1003,7 +1003,10 @@ onAuthStateChanged(auth, async (user) => {
     if (filterEmp) {
       filterEmp.classList.add('hidden');
     }
-    // Show support banner and tasks inbox for employees
+  }
+
+  // Show support banner and tasks inbox for non-admins
+  if (userRole !== 'admin') {
     document.getElementById('support-banner').style.display = 'block';
     document.getElementById('tasks-inbox').style.display = 'block';
     loadEmployeeTasks(user.uid);
