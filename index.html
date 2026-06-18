@@ -422,6 +422,10 @@ tr:hover td{background:var(--bg-secondary);}
     </div>
     <div id="bulk-step-preview" style="display:none;">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;"><span id="bulk-preview-count" style="font-size:13px;font-weight:600;color:var(--accent);"></span><span style="font-size:12px;color:var(--text-muted);">— assigned to you</span></div>
+      <div id="bulk-skip-dupes-wrap" style="display:none;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:var(--radius);">
+        <input type="checkbox" id="bulk-skip-dupes" checked style="margin:0;">
+        <label for="bulk-skip-dupes" style="font-size:12.5px;color:#991b1b;cursor:pointer;">Skip duplicate phone numbers (don't upload rows marked as duplicates)</label>
+      </div>
       <div style="overflow-x:auto;max-height:280px;border:1px solid var(--border);border-radius:var(--radius);"><table style="width:100%;border-collapse:collapse;font-size:12px;"><thead id="bulk-preview-head" style="position:sticky;top:0;background:var(--bg-secondary);"></thead><tbody id="bulk-preview-body"></tbody></table></div>
       <div id="bulk-publish-alert" style="margin-top:10px;"></div>
       <div class="modal-footer"><button class="btn" onclick="bulkCancelPreview()">← Back</button><button class="btn btn-accent" id="bulk-publish-btn" onclick="bulkPublishLeads()">Upload Leads</button></div>
@@ -433,7 +437,7 @@ tr:hover td{background:var(--bg-secondary);}
 
 <script type="module">
 import { db, auth } from './firebase-init.js';
-import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, setDoc, serverTimestamp, where, writeBatch, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, setDoc, serverTimestamp, where, writeBatch, orderBy, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const STATUSES = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
@@ -892,6 +896,7 @@ function renderDetailBody(lead) {
   const webUrl = f(lead,'website');
   const linkedin = f(lead,'linkedin');
   const callLog = Array.isArray(lead._callLog) ? lead._callLog : [];
+  const notesHistory = Array.isArray(lead._notesHistory) ? lead._notesHistory : [];
   const cs = callbackStatus(lead);
 
   document.getElementById('detail-body').innerHTML = `
@@ -975,11 +980,22 @@ function renderDetailBody(lead) {
       </div>
     </div>
 
-    <!-- Edit Notes -->
+    <!-- Notes History (append-only) -->
     <div class="detail-section">
-      <div class="detail-section-title">Quick Note</div>
-      <textarea id="detail-note" rows="2" placeholder="Add or edit a note…" style="width:100%;padding:9px 12px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;resize:vertical;font-family:inherit;">${esc(lead._note||'')}</textarea>
-      <button class="btn" style="margin-top:8px;padding:6px 14px;font-size:12px;" onclick="saveDetailNote('${lead.id}')">Save Note</button>
+      <div class="detail-section-title">Notes History (${notesHistory.length})</div>
+      <div id="notes-history-container" style="max-height:180px;overflow-y:auto;margin-bottom:10px;">
+        ${notesHistory.length === 0
+          ? '<p style="font-size:13px;color:var(--text-hint);">No notes yet.</p>'
+          : [...notesHistory].reverse().map(entry => {
+              return '<div style="padding:8px 10px;border-left:2px solid var(--border-strong);margin-bottom:6px;">' +
+                '<div style="font-size:13px;white-space:pre-wrap;">'+esc(entry.text)+'</div>' +
+                '<div style="font-size:11.5px;color:var(--text-hint);margin-top:3px;">'+esc(entry.agentName||'Agent')+' · '+new Date(entry.ts).toLocaleString('en-CA',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})+'</div>' +
+              '</div>';
+            }).join('')
+        }
+      </div>
+      <textarea id="detail-note" rows="2" placeholder="Add a note…" style="width:100%;padding:9px 12px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;resize:vertical;font-family:inherit;"></textarea>
+      <button class="btn" style="margin-top:8px;padding:6px 14px;font-size:12px;" onclick="addDetailNote('${lead.id}')">Add Note</button>
     </div>
   `;
 }
@@ -1006,12 +1022,26 @@ window.saveCallbackDate = async function(val) {
   } catch(e) { showToast('Error saving date'); }
 };
 
-window.saveDetailNote = async function(id) {
-  const note = document.getElementById('detail-note').value;
+window.addDetailNote = async function(id) {
+  const textarea = document.getElementById('detail-note');
+  const text = textarea.value.trim();
+  if (!text) { showToast('Note is empty'); return; }
+  const agentName = localStorage.getItem('user_name') || 'Agent';
+  const entry = { text, agentName, ts: new Date().toISOString() };
   try {
-    await updateDoc(doc(db,'leads',id), {_note:note, _updatedAt:serverTimestamp()});
-    showToast('✓ Note saved');
-  } catch(e) { showToast('Error saving note'); }
+    await updateDoc(doc(db,'leads',id), {
+      _notesHistory: arrayUnion(entry),
+      _note: text, // keep latest note mirrored here for table view + CSV export
+      _updatedAt: serverTimestamp()
+    });
+    textarea.value = '';
+    showToast('✓ Note added');
+    const lead = leads.find(l => l.id === id);
+    if (lead) {
+      const updatedHistory = [...(Array.isArray(lead._notesHistory)?lead._notesHistory:[]), entry];
+      renderDetailBody({...lead, _notesHistory: updatedHistory, _note: text});
+    }
+  } catch(e) { showToast('Error adding note'); }
 };
 
 window.logCall = async function(id) {
@@ -1075,7 +1105,7 @@ window.saveLead = async (e) => {
       website: document.getElementById('lead-website').value.trim(),
       assignedTo: userRole==='admin' ? '' : (currentUser?currentUser.uid:''),
       assignedName: userRole==='admin' ? '' : (localStorage.getItem('user_name')||''),
-      _status:'Not Called', _note:'', _callLog:[], _callbackDate:'',
+      _status:'Not Called', _note:'', _notesHistory:[], _callLog:[], _callbackDate:'',
       _createdAt: new Date().toISOString(), _updatedAt: serverTimestamp()
     });
     closeAddLeadModal();
@@ -1212,7 +1242,7 @@ function bulkParseCSV(text) {
   const bGuess=bulkGuess('businessName');
   if(bGuess){
     bulkParsedLeads=bulkRawRows.map(row=>{
-      const lead={_status:'Not Called',_note:'',_callLog:[],_callbackDate:''};
+      const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:''};
       BULK_TRACKER_FIELDS.forEach(f=>{const g=bulkGuess(f.key);lead[f.key]=g?(row[g]||''):'';});
       return lead;
     });
@@ -1232,7 +1262,7 @@ function bulkShowMapping(){
 window.bulkCancelMapping=function(){document.getElementById('bulk-step-mapping').style.display='none';document.getElementById('bulk-step-upload').style.display='block';document.getElementById('bulk-file-input').value='';};
 window.bulkApplyMapping=function(){
   bulkParsedLeads=bulkRawRows.map(row=>{
-    const lead={_status:'Not Called',_note:'',_callLog:[],_callbackDate:''};
+    const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:''};
     BULK_TRACKER_FIELDS.forEach(f=>{const val=document.getElementById('bulk-map-'+f.key).value;lead[f.key]=val?(row[val]||''):'';});
     return lead;
   });
@@ -1240,32 +1270,64 @@ window.bulkApplyMapping=function(){
   document.getElementById('bulk-step-mapping').style.display='none';
   bulkRenderPreview();
 };
+function bulkNormPhone(p) { return String(p||'').replace(/\D/g,''); }
+function bulkComputeDupes() {
+  const existingPhones = new Set(leads.map(l => bulkNormPhone(f(l,'phone'))).filter(Boolean));
+  const seenInBatch = new Map(); // normPhone -> count
+  return bulkParsedLeads.map(lead => {
+    const np = bulkNormPhone(lead.phone);
+    if (!np) return { ...lead, _dupType: null };
+    const inBatchCount = (seenInBatch.get(np) || 0) + 1;
+    seenInBatch.set(np, inBatchCount);
+    let dupType = null;
+    if (existingPhones.has(np)) dupType = 'existing';
+    else if (inBatchCount > 1) dupType = 'batch';
+    return { ...lead, _dupType: dupType };
+  });
+}
 function bulkRenderPreview(){
   document.getElementById('bulk-step-upload').style.display='none';
   document.getElementById('bulk-step-mapping').style.display='none';
   document.getElementById('bulk-step-preview').style.display='block';
+  bulkParsedLeads = bulkComputeDupes();
+  const dupCount = bulkParsedLeads.filter(l => l._dupType).length;
   const fields=BULK_TRACKER_FIELDS.filter(f=>bulkParsedLeads[0]&&bulkParsedLeads[0][f.key]!==undefined);
-  document.getElementById('bulk-preview-count').textContent=bulkParsedLeads.length+' lead'+(bulkParsedLeads.length!==1?'s':'')+' ready';
-  document.getElementById('bulk-preview-head').innerHTML='<tr>'+fields.map(f=>'<th style="padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);">'+f.label+'</th>').join('')+'</tr>';
+  document.getElementById('bulk-preview-count').textContent=bulkParsedLeads.length+' lead'+(bulkParsedLeads.length!==1?'s':'')+' ready'+(dupCount?' • '+dupCount+' duplicate'+(dupCount!==1?'s':'')+' detected':'');
+  document.getElementById('bulk-preview-head').innerHTML='<tr><th style="padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);"></th>'+fields.map(f=>'<th style="padding:7px 10px;font-size:11px;font-weight:600;color:var(--text-muted);border-bottom:1px solid var(--border);">'+f.label+'</th>').join('')+'</tr>';
   const sample=bulkParsedLeads.slice(0,12);
-  document.getElementById('bulk-preview-body').innerHTML=sample.map((row,i)=>'<tr style="background:'+(i%2===0?'var(--bg-secondary)':'var(--bg)')+';">'+fields.map(f=>{const val=row[f.key]||'';return '<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="'+esc(val)+'">'+esc(val||'—')+'</td>';}).join('')+'</tr>').join('')+(bulkParsedLeads.length>12?'<tr><td colspan="'+fields.length+'" style="text-align:center;padding:10px;color:var(--text-hint);font-size:12px;">… and '+(bulkParsedLeads.length-12)+' more</td></tr>':'');
+  document.getElementById('bulk-preview-body').innerHTML=sample.map((row,i)=>{
+    const dupBg = row._dupType ? '#fef2f2' : (i%2===0?'var(--bg-secondary)':'var(--bg)');
+    const dupCell = row._dupType
+      ? '<span style="font-size:10.5px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:8px;white-space:nowrap;">'+(row._dupType==='existing'?'Already exists':'Dup in file')+'</span>'
+      : '';
+    return '<tr style="background:'+dupBg+';">'+
+      '<td style="padding:7px 10px;border-bottom:1px solid var(--border);">'+dupCell+'</td>'+
+      fields.map(f=>{const val=row[f.key]||'';return '<td style="padding:7px 10px;font-size:12px;border-bottom:1px solid var(--border);white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;" title="'+esc(val)+'">'+esc(val||'—')+'</td>';}).join('')+'</tr>';
+  }).join('')+(bulkParsedLeads.length>12?'<tr><td colspan="'+(fields.length+1)+'" style="text-align:center;padding:10px;color:var(--text-hint);font-size:12px;">… and '+(bulkParsedLeads.length-12)+' more</td></tr>':'');
+  const skipWrap = document.getElementById('bulk-skip-dupes-wrap');
+  if (skipWrap) skipWrap.style.display = dupCount ? 'flex' : 'none';
 }
 window.bulkCancelPreview=function(){document.getElementById('bulk-step-preview').style.display='none';bulkRawRows.length>0?bulkShowMapping():(document.getElementById('bulk-step-upload').style.display='block');};
 window.bulkPublishLeads=async function(){
   if(!currentUser){bulkAlert('bulk-publish-alert','Not logged in.','danger');return;}
   if(!bulkParsedLeads.length) return;
+  const skipDupes = document.getElementById('bulk-skip-dupes');
+  const toPublish = (skipDupes && skipDupes.checked) ? bulkParsedLeads.filter(l => !l._dupType) : bulkParsedLeads;
+  if(!toPublish.length){bulkAlert('bulk-publish-alert','All rows are duplicates — nothing to upload.','danger');return;}
   const btn=document.getElementById('bulk-publish-btn'); btn.disabled=true; btn.style.opacity='0.6';
   try {
     showToast('Uploading…');
     const assignedTo=currentUser.uid; const assignedName=localStorage.getItem('user_name')||'';
     let count=0; let b=writeBatch(db);
-    for(const lead of bulkParsedLeads){
+    for(const leadRaw of toPublish){
+      const { _dupType, ...lead } = leadRaw;
       const ref=doc(collection(db,'leads'));
       b.set(ref,{...lead,assignedTo,assignedName,_id:ref.id,_createdAt:new Date().toISOString()});
       count++; if(count%499===0){await b.commit();b=writeBatch(db);}
     }
     await b.commit();
-    showToast('✓ '+bulkParsedLeads.length+' leads uploaded!');
+    const skipped = bulkParsedLeads.length - toPublish.length;
+    showToast('✓ '+toPublish.length+' leads uploaded'+(skipped?' ('+skipped+' duplicates skipped)':'')+'!');
     closeBulkUploadModal();
   } catch(e){bulkAlert('bulk-publish-alert','Error: '+e.message,'danger');btn.disabled=false;btn.style.opacity='1';}
 };
