@@ -760,6 +760,7 @@
     </select>
     <select id="filter-city" onchange="renderTable()"><option value="">All Cities</option></select>
     <select id="filter-province" onchange="renderTable()"><option value="">All Provinces</option></select>
+    <select id="filter-niche" onchange="renderTable()"><option value="">All Niches</option></select>
     <select id="sort-by" onchange="renderTable()">
       <option value="newest">Sort by: Newest Added</option>
       <option value="oldest">Sort by: Oldest Added</option>
@@ -1143,12 +1144,15 @@ function updateDashboardStats() {
 function populateFilters() {
   const cities = [...new Set(leads.map(l => f(l,'city')).filter(Boolean))].sort();
   const provinces = [...new Set(leads.map(l => f(l,'province')).filter(Boolean))].sort();
+  const niches = [...new Set(leads.map(l => f(l,'industry')).filter(Boolean))].sort();
   const cityEl = document.getElementById('filter-city');
   const provEl = document.getElementById('filter-province');
-  const sc = cityEl.value, sp = provEl.value;
+  const nicheEl = document.getElementById('filter-niche');
+  const sc = cityEl.value, sp = provEl.value, sn = nicheEl.value;
   cityEl.innerHTML = '<option value="">All Cities</option>' + cities.map(c => '<option>' + esc(c) + '</option>').join('');
   provEl.innerHTML = '<option value="">All Provinces</option>' + provinces.map(p => '<option>' + esc(p) + '</option>').join('');
-  cityEl.value = sc; provEl.value = sp;
+  nicheEl.innerHTML = '<option value="">All Niches</option>' + niches.map(n => '<option>' + esc(n) + '</option>').join('');
+  cityEl.value = sc; provEl.value = sp; nicheEl.value = sn;
 }
 
 function renderPills() {
@@ -1171,6 +1175,7 @@ function renderTable() {
   const fEmployee = document.getElementById('filter-employee') ? document.getElementById('filter-employee').value : '';
   const fCity = document.getElementById('filter-city').value;
   const fProv = document.getElementById('filter-province').value;
+  const fNiche = document.getElementById('filter-niche').value;
   const sortBy = document.getElementById('sort-by').value;
 
   // Filter
@@ -1185,6 +1190,7 @@ function renderTable() {
     }
     if (fCity && f(l,'city') !== fCity) return false;
     if (fProv && f(l,'province') !== fProv) return false;
+    if (fNiche && f(l,'industry') !== fNiche) return false;
     if (q) {
       const hay = [f(l,'businessName'), f(l,'contactName'), f(l,'city'), f(l,'industry'), f(l,'phone')].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
