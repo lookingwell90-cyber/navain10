@@ -322,6 +322,7 @@ tr:hover td{background:var(--bg-secondary);}
     </div>
     <select id="filter-status" onchange="renderTable()">
       <option value="">All Statuses</option>
+      <option value="__priority__">⭐ Priority</option>
       <option>Not Called</option><option>No Answer</option><option>Voicemail</option>
       <option>Interested</option><option>Not Interested</option>
       <option>Callback Scheduled</option><option>Wrong Number</option>
@@ -686,7 +687,8 @@ window.renderTable = function() {
   const sortBy = document.getElementById('sort-by').value;
 
   let filtered = leads.filter(l => {
-    if (fStatus && l._status !== fStatus) return false;
+    if (fStatus === '__priority__') { if (!l._adminAssigned) return false; }
+    else if (fStatus && l._status !== fStatus) return false;
     if (userRole === 'admin' && fEmployee) {
       if (fEmployee === 'unassigned') { if (l.assignedTo) return false; }
       else { if (l.assignedTo !== fEmployee) return false; }
@@ -1202,7 +1204,8 @@ window.exportCSV = function() {
   const fCallback = document.getElementById('filter-callback').value;
 
   let filtered = leads.filter(l => {
-    if (fStatus && l._status !== fStatus) return false;
+    if (fStatus === '__priority__') { if (!l._adminAssigned) return false; }
+    else if (fStatus && l._status !== fStatus) return false;
     if (userRole === 'admin' && fEmployee) {
       if (fEmployee === 'unassigned') { if (l.assignedTo) return false; }
       else { if (l.assignedTo !== fEmployee) return false; }
