@@ -451,6 +451,21 @@
         </button>
         <div id="assign-leads-alert" style="margin-top:10px;min-height:20px;"></div>
       </div>
+
+      <!-- CSV Priority Upload -->
+      <div style="border-top:1px solid var(--border);margin-top:16px;padding-top:20px;">
+        <h3 style="font-size:13.5px;font-weight:600;color:var(--text-muted);margin-bottom:8px;">Or Upload a CSV of Priority Leads</h3>
+        <p style="font-size:12.5px;color:var(--text-hint);margin-bottom:12px;">Upload a CSV of leads — all will be marked ⭐ Priority and assigned to the employee selected above.</p>
+        <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+          <label class="btn" style="cursor:pointer;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Choose CSV File
+            <input type="file" id="priority-csv-input" accept=".csv" onchange="handlePriorityCSV(this)" style="display:none;">
+          </label>
+          <span id="priority-csv-filename" style="font-size:13px;color:var(--text-muted);"></span>
+        </div>
+        <div id="priority-csv-alert" style="margin-top:10px;min-height:20px;"></div>
+      </div>
     </div>
   </div>
 
@@ -836,7 +851,7 @@ window.assignSelectedLeads = async function() {
     let batch = writeBatch(db);
     let count = 0;
     for (const id of checked) {
-      batch.update(doc(db, 'leads', id), { assignedTo: empId, assignedName: empName, _updatedAt: new Date().toISOString() });
+      batch.update(doc(db, 'leads', id), { assignedTo: empId, assignedName: empName, _adminAssigned: true, _updatedAt: new Date().toISOString() });
       count++;
       if (count % 499 === 0) { await batch.commit(); batch = writeBatch(db); }
     }
@@ -1250,6 +1265,113 @@ function showToast(msg) {
   t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 2800);
 }
+
+// ── Priority CSV Upload ────────────────────────────────────────────
+window.handlePriorityCSV = async function(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const filenameEl = document.getElementById('priority-csv-filename');
+  const alertEl = document.getElementById('priority-csv-alert');
+  filenameEl.textContent = file.name;
+
+  const empId = document.getElementById('assign-leads-employee').value;
+  if (!empId) {
+    priorityCsvAlert(alertEl, 'Please select an employee first, then re-choose the file.', 'danger');
+    input.value = '';
+    filenameEl.textContent = '';
+    return;
+  }
+  const emp = employees.find(function(e) { return e.uid === empId; });
+  const empName = emp ? emp.name : '';
+
+  const text = await file.text();
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) { priorityCsvAlert(alertEl, 'CSV appears empty.', 'danger'); return; }
+
+  const headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g,''); });
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = lines[i].split(',').map(function(v) { return v.trim().replace(/^"|"$/g,''); });
+    const row = {};
+    headers.forEach(function(h, idx) { row[h] = vals[idx] || ''; });
+    rows.push(row);
+  }
+
+  if (rows.length === 0) { priorityCsvAlert(alertEl, 'No data rows found.', 'danger'); return; }
+
+  if (!confirm('Upload ' + rows.length + ' leads as Priority and assign to ' + empName + '?')) {
+    input.value = '';
+    filenameEl.textContent = '';
+    return;
+  }
+
+  const PRIORITY_AUTO_MAP = {
+    businessName: ['business name','company','company name','organization','salon name','business','name'],
+    contactName:  ['contact name','full name','contact','person'],
+    phone:        ['phone','mobile','telephone','cell','phone number'],
+    email:        ['email','e-mail','email address','mail'],
+    city:         ['city','town','location'],
+    province:     ['province','state','region'],
+    industry:     ['industry','sector','type','category'],
+    website:      ['website','url','web','site','domain'],
+    linkedin:     ['linkedin','linkedin url','li'],
+    jobTitle:     ['job title','title','role','position'],
+  };
+
+  function guessKey(key) {
+    const guesses = PRIORITY_AUTO_MAP[key] || [];
+    for (let gi = 0; gi < guesses.length; gi++) {
+      const found = headers.find(function(h) { return h.toLowerCase().trim() === guesses[gi]; });
+      if (found) return found;
+    }
+    return null;
+  }
+
+  try {
+    priorityCsvAlert(alertEl, 'Uploading...', 'info');
+    let batch = writeBatch(db);
+    let count = 0;
+    for (let ri = 0; ri < rows.length; ri++) {
+      const row = rows[ri];
+      const lead = { _status: 'Not Called', _note: '', _notesHistory: [], _callLog: [], _callbackDate: '' };
+      Object.keys(PRIORITY_AUTO_MAP).forEach(function(key) {
+        const h = guessKey(key);
+        lead[key] = h ? (row[h] || '') : '';
+      });
+      const ref = doc(collection(db, 'leads'));
+      const docData = Object.assign({}, lead, {
+        assignedTo: empId,
+        assignedName: empName,
+        _adminAssigned: true,
+        _id: ref.id,
+        _createdAt: new Date().toISOString(),
+        _updatedAt: new Date().toISOString(),
+      });
+      batch.set(ref, docData);
+      count++;
+      if (count % 499 === 0) { await batch.commit(); batch = writeBatch(db); }
+    }
+    await batch.commit();
+
+    priorityCsvAlert(alertEl, '\u2713 ' + rows.length + ' priority leads uploaded and assigned to ' + empName + '.', 'success');
+    showToast('\u2713 ' + rows.length + ' priority leads assigned to ' + empName);
+    input.value = '';
+    filenameEl.textContent = '';
+    showCurrentCount();
+  } catch(e) {
+    priorityCsvAlert(alertEl, 'Error: ' + e.message, 'danger');
+  }
+};
+
+function priorityCsvAlert(el, msg, type) {
+  const colors = { success:'#16a34a', danger:'#dc2626', info:'var(--accent)' };
+  const bgs = { success:'#f0fdf4', danger:'#fef2f2', info:'var(--bg-secondary)' };
+  el.innerHTML = msg
+    ? '<div style="padding:8px 12px;border-radius:var(--radius);border:1px solid ' + (colors[type] || 'var(--border)') + ';background:' + (bgs[type] || 'var(--bg-secondary)') + ';color:' + (colors[type] || 'var(--text)') + ';font-size:13px;">' + msg + '</div>'
+    : '';
+}
+
 </script>
 </body>
 </html>
