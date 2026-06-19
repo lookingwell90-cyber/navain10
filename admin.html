@@ -407,6 +407,12 @@
         Send to Employee
       </button>
     </div>
+    <div style="margin-top:24px;border-top:1px solid var(--border);padding-top:16px;">
+      <div style="font-size:12.5px;font-weight:600;color:var(--text-muted);margin-bottom:10px;">SENT TASKS</div>
+      <div id="sent-tasks-list" style="display:flex;flex-direction:column;gap:8px;">
+        <p style="font-size:13px;color:var(--text-hint);">Loading...</p>
+      </div>
+    </div>
   </div>
 
   <!-- Assign Specific Leads Card -->
@@ -618,6 +624,7 @@ onAuthStateChanged(auth, async (user) => {
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
+    await loadSentTasks();
   } else {
     document.getElementById('employee-manager-card').classList.add('hidden');
     document.getElementById('clear-leads-btn').classList.add('hidden');
@@ -910,8 +917,57 @@ window.sendTask = async function() {
     taskAlert(alertEl, `✓ Task sent to ${empName} successfully.`, 'success');
     setTimeout(() => taskAlert(alertEl, '', ''), 3500);
     showToast('✓ Task sent!');
+    await loadSentTasks();
   } catch(e) {
     taskAlert(alertEl, 'Error sending task: ' + e.message, 'danger');
+  }
+};
+
+window.loadSentTasks = async function() {
+  const container = document.getElementById('sent-tasks-list');
+  if (!container) return;
+  try {
+    const snap = await getDocs(collection(db, 'tasks'));
+    const tasks = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    if (!tasks.length) {
+      container.innerHTML = '<p style="font-size:13px;color:var(--text-hint);">No tasks sent yet.</p>';
+      return;
+    }
+    const TYPE_ICON = { task:'📋', customer:'⭐', urgent:'🔴' };
+    container.innerHTML = tasks.map(t => {
+      const icon = TYPE_ICON[t.type] || '📋';
+      const date = t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+      const readBadge = t.read
+        ? '<span style="font-size:11px;color:#16a34a;">✓ Read</span>'
+        : '<span style="font-size:11px;color:var(--accent);">● Unread</span>';
+      return `<div id="sent-task-${esc(t.id)}" style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius);padding:10px 12px;display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+        <div style="min-width:0;">
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:2px;">
+            <span>${icon}</span>
+            <strong style="font-size:13px;">${esc(t.title)}</strong>
+            ${readBadge}
+          </div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:2px;">To: <strong>${esc(t.assignedName)}</strong> · ${esc(date)}</div>
+          <div style="font-size:12.5px;color:var(--text-muted);white-space:pre-wrap;">${esc(t.message)}</div>
+        </div>
+        <button onclick="deleteTask('${esc(t.id)}')" title="Delete task" style="flex-shrink:0;font-size:12px;padding:5px 10px;border:1px solid #fca5a5;border-radius:var(--radius);background:#fef2f2;color:#dc2626;cursor:pointer;">🗑 Delete</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    container.innerHTML = '<p style="font-size:13px;color:#dc2626;">Error loading tasks: ' + esc(e.message) + '</p>';
+  }
+};
+
+window.deleteTask = async function(taskId) {
+  if (!confirm('Delete this task? The employee will no longer see it.')) return;
+  try {
+    await deleteDoc(doc(db, 'tasks', taskId));
+    const card = document.getElementById('sent-task-' + taskId);
+    if (card) card.remove();
+    showToast('✓ Task deleted');
+  } catch(e) {
+    alert('Error deleting task: ' + e.message);
   }
 };
 
