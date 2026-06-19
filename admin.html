@@ -409,6 +409,51 @@
     </div>
   </div>
 
+  <!-- Assign Specific Leads Card -->
+  <div class="card" id="assign-leads-card" style="display:none;">
+    <div class="card-title">Assign Specific Leads to Employee</div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">Search and select important leads, then assign them directly to an employee.</p>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:200px;">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Search Leads</label>
+          <input type="text" id="assign-leads-search" placeholder="Search by business name, city, phone…"
+            oninput="filterAssignLeads()"
+            style="width:100%;margin-top:6px;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;box-sizing:border-box;">
+        </div>
+        <div style="min-width:180px;">
+          <label style="font-size:12.5px;font-weight:600;color:var(--text-muted);">Assign To</label>
+          <select id="assign-leads-employee" style="width:100%;margin-top:6px;padding:10px 14px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13.5px;outline:none;cursor:pointer;">
+            <option value="">— Select Employee —</option>
+          </select>
+        </div>
+        <button class="btn" onclick="loadAssignLeads()" style="white-space:nowrap;height:42px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Load Leads
+        </button>
+      </div>
+
+      <!-- Select All Row -->
+      <div id="assign-leads-select-all-row" style="display:none;align-items:center;gap:10px;padding:8px 12px;background:var(--bg-secondary);border-radius:var(--radius);border:1px solid var(--border);">
+        <input type="checkbox" id="assign-select-all" onchange="toggleSelectAllLeads(this)" style="width:15px;height:15px;cursor:pointer;">
+        <label for="assign-select-all" style="font-size:13px;font-weight:600;cursor:pointer;color:var(--text);">Select All Visible</label>
+        <span id="assign-selected-count" style="font-size:12px;color:var(--accent);font-weight:600;margin-left:auto;"></span>
+      </div>
+
+      <!-- Leads List -->
+      <div id="assign-leads-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;"></div>
+
+      <!-- Action Button -->
+      <div id="assign-leads-action-row" style="display:none;">
+        <button class="btn btn-primary" onclick="assignSelectedLeads()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          Assign Selected Leads
+        </button>
+        <div id="assign-leads-alert" style="margin-top:10px;min-height:20px;"></div>
+      </div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Upload Dataset</div>
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
@@ -553,6 +598,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('employee-manager-card').classList.remove('hidden');
     document.getElementById('clear-leads-btn').classList.remove('hidden');
     document.getElementById('csv-assignee-group').classList.remove('hidden');
+    document.getElementById('assign-leads-card').style.display = 'block';
     document.getElementById('assign-task-card').style.display = 'block';
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
@@ -691,6 +737,129 @@ function populateTaskEmployeeDropdown() {
   const onlyEmployees = employees.filter(e => e.role !== 'admin');
   el.innerHTML = '<option value="">— Select Employee —</option>' +
     onlyEmployees.map(emp => `<option value="${emp.uid}">${esc(emp.name)}</option>`).join('');
+  // Also populate the assign-leads-employee dropdown
+  const el2 = document.getElementById('assign-leads-employee');
+  if (el2) {
+    el2.innerHTML = '<option value="">— Select Employee —</option>' +
+      employees.map(emp => `<option value="${emp.uid}">${esc(emp.name)} (${emp.role === 'admin' ? 'Admin' : 'Employee'})</option>`).join('');
+  }
+}
+
+// ── Assign Specific Leads ──────────────────────────────────────────
+let allAssignLeads = [];
+let filteredAssignLeads = [];
+
+window.loadAssignLeads = async function() {
+  const listEl = document.getElementById('assign-leads-list');
+  listEl.innerHTML = '<p style="font-size:13px;color:var(--text-hint);padding:8px 0;">Loading leads…</p>';
+  document.getElementById('assign-leads-select-all-row').style.display = 'none';
+  document.getElementById('assign-leads-action-row').style.display = 'none';
+  try {
+    const snap = await getDocs(collection(db, 'leads'));
+    allAssignLeads = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    filterAssignLeads();
+  } catch(e) {
+    listEl.innerHTML = `<p style="font-size:13px;color:var(--danger-text);">Error loading leads: ${e.message}</p>`;
+  }
+};
+
+window.filterAssignLeads = function() {
+  const q = (document.getElementById('assign-leads-search').value || '').toLowerCase().trim();
+  filteredAssignLeads = q
+    ? allAssignLeads.filter(l =>
+        (l.businessName||'').toLowerCase().includes(q) ||
+        (l.city||'').toLowerCase().includes(q) ||
+        (l.phone||'').toLowerCase().includes(q) ||
+        (l.contactName||'').toLowerCase().includes(q)
+      )
+    : [...allAssignLeads];
+  renderAssignLeadsList();
+};
+
+function renderAssignLeadsList() {
+  const listEl = document.getElementById('assign-leads-list');
+  const selectAllRow = document.getElementById('assign-leads-select-all-row');
+  const actionRow = document.getElementById('assign-leads-action-row');
+
+  if (filteredAssignLeads.length === 0) {
+    listEl.innerHTML = '<p style="font-size:13px;color:var(--text-hint);padding:8px 0;">No leads found. Try a different search or click Load Leads first.</p>';
+    selectAllRow.style.display = 'none';
+    actionRow.style.display = 'none';
+    return;
+  }
+
+  selectAllRow.style.display = 'flex';
+  actionRow.style.display = 'block';
+  document.getElementById('assign-select-all').checked = false;
+  updateAssignSelectedCount();
+
+  listEl.innerHTML = filteredAssignLeads.map(lead => {
+    const assigned = lead.assignedName ? `<span style="font-size:11px;color:var(--accent);margin-left:6px;">→ ${esc(lead.assignedName)}</span>` : '';
+    const city = lead.city ? ` · ${esc(lead.city)}` : '';
+    const phone = lead.phone ? ` · ${esc(lead.phone)}` : '';
+    return `<label style="display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--bg-secondary);border-radius:var(--radius);border:1px solid var(--border);cursor:pointer;font-size:13px;transition:var(--transition);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+      <input type="checkbox" class="assign-lead-cb" data-id="${lead.id}" onchange="updateAssignSelectedCount()" style="width:15px;height:15px;cursor:pointer;flex-shrink:0;">
+      <span style="flex:1;min-width:0;">
+        <strong style="color:var(--text);">${esc(lead.businessName || '—')}</strong>${assigned}
+        <span style="color:var(--text-muted);font-size:12px;display:block;">${esc(lead._status||'Not Called')}${city}${phone}</span>
+      </span>
+    </label>`;
+  }).join('');
+}
+
+window.toggleSelectAllLeads = function(cb) {
+  document.querySelectorAll('.assign-lead-cb').forEach(el => el.checked = cb.checked);
+  updateAssignSelectedCount();
+};
+
+function updateAssignSelectedCount() {
+  const checked = document.querySelectorAll('.assign-lead-cb:checked').length;
+  const countEl = document.getElementById('assign-selected-count');
+  countEl.textContent = checked > 0 ? `${checked} selected` : '';
+}
+
+window.assignSelectedLeads = async function() {
+  const empId = document.getElementById('assign-leads-employee').value;
+  const alertEl = document.getElementById('assign-leads-alert');
+  const checked = [...document.querySelectorAll('.assign-lead-cb:checked')].map(el => el.dataset.id);
+
+  if (!empId) { assignAlert(alertEl, 'Please select an employee first.', 'danger'); return; }
+  if (checked.length === 0) { assignAlert(alertEl, 'Please select at least one lead.', 'danger'); return; }
+
+  const emp = employees.find(e => e.uid === empId);
+  const empName = emp ? emp.name : '';
+
+  if (!confirm(`Assign ${checked.length} lead(s) to ${empName}?`)) return;
+
+  try {
+    assignAlert(alertEl, 'Assigning…', 'info');
+    let batch = writeBatch(db);
+    let count = 0;
+    for (const id of checked) {
+      batch.update(doc(db, 'leads', id), { assignedTo: empId, assignedName: empName, _updatedAt: new Date().toISOString() });
+      count++;
+      if (count % 499 === 0) { await batch.commit(); batch = writeBatch(db); }
+    }
+    await batch.commit();
+
+    // Update local cache
+    allAssignLeads = allAssignLeads.map(l => checked.includes(l.id) ? {...l, assignedTo: empId, assignedName: empName} : l);
+    filterAssignLeads();
+
+    assignAlert(alertEl, `✓ ${checked.length} lead(s) assigned to ${empName}.`, 'success');
+    showToast(`✓ ${checked.length} leads assigned to ${empName}`);
+    setTimeout(() => assignAlert(alertEl, '', ''), 3500);
+  } catch(e) {
+    assignAlert(alertEl, 'Error: ' + e.message, 'danger');
+  }
+};
+
+function assignAlert(el, msg, type) {
+  const colors = { success:'#16a34a', danger:'#dc2626', info:'var(--accent)' };
+  const bgs = { success:'#f0fdf4', danger:'#fef2f2', info:'var(--bg-secondary)' };
+  el.innerHTML = msg
+    ? `<div style="padding:8px 12px;border-radius:var(--radius);border:1px solid ${colors[type]||'var(--border)'};background:${bgs[type]||'var(--bg-secondary)'};color:${colors[type]||'var(--text)'};font-size:13px;">${msg}</div>`
+    : '';
 }
 
 window.sendTask = async function() {
