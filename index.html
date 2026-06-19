@@ -336,6 +336,7 @@ tr:hover td{background:var(--bg-secondary);}
       <option value="today">Due Today</option>
     </select>
     <select id="sort-by" onchange="renderTable()">
+      <option value="number">By Number (#)</option>
       <option value="newest">Newest First</option>
       <option value="oldest">Oldest First</option>
       <option value="name">Business A-Z</option>
@@ -706,6 +707,7 @@ window.renderTable = function() {
   });
 
   filtered.sort((a,b) => {
+    if (sortBy === 'number') { return leads.indexOf(a) - leads.indexOf(b); }
     if (sortBy === 'newest') { return (new Date(b._createdAt||0))-(new Date(a._createdAt||0)); }
     if (sortBy === 'oldest') { return (new Date(a._createdAt||0))-(new Date(b._createdAt||0)); }
     if (sortBy === 'name') { return (f(a,'businessName')||'').toLowerCase().localeCompare((f(b,'businessName')||'').toLowerCase()); }
