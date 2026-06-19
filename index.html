@@ -707,11 +707,11 @@ window.renderTable = function() {
   });
 
   filtered.sort((a,b) => {
-    if (sortBy === 'number') { return leads.indexOf(a) - leads.indexOf(b); }
-    if (sortBy === 'newest') { return (new Date(b._createdAt||0))-(new Date(a._createdAt||0)); }
-    if (sortBy === 'oldest') { return (new Date(a._createdAt||0))-(new Date(b._createdAt||0)); }
-    if (sortBy === 'name') { return (f(a,'businessName')||'').toLowerCase().localeCompare((f(b,'businessName')||'').toLowerCase()); }
-    if (sortBy === 'status') { return (a._status||'').localeCompare(b._status||''); }
+    if (sortBy === 'number') { if (!!b._adminAssigned !== !!a._adminAssigned) return b._adminAssigned ? 1 : -1; return leads.indexOf(a) - leads.indexOf(b); }
+    if (sortBy === 'newest') { if (!!b._adminAssigned !== !!a._adminAssigned) return b._adminAssigned ? 1 : -1; return (new Date(b._createdAt||0))-(new Date(a._createdAt||0)); }
+    if (sortBy === 'oldest') { if (!!b._adminAssigned !== !!a._adminAssigned) return b._adminAssigned ? 1 : -1; return (new Date(a._createdAt||0))-(new Date(b._createdAt||0)); }
+    if (sortBy === 'name') { if (!!b._adminAssigned !== !!a._adminAssigned) return b._adminAssigned ? 1 : -1; return (f(a,'businessName')||'').toLowerCase().localeCompare((f(b,'businessName')||'').toLowerCase()); }
+    if (sortBy === 'status') { if (!!b._adminAssigned !== !!a._adminAssigned) return b._adminAssigned ? 1 : -1; return (a._status||'').localeCompare(b._status||''); }
     if (sortBy === 'callback') { return (a._callbackDate||'9999').localeCompare(b._callbackDate||'9999'); }
     return 0;
   });
