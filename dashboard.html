@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Navain AI — Dashboard</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png">
+<meta name="theme-color" content="#2563eb">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #ffffff; --bg-secondary: #f8fafc; --bg-tertiary: #f1f5f9;
+  --text: #0f172a; --text-muted: #475569; --text-hint: #94a3b8;
+  --border: rgba(15,23,42,0.08); --border-strong: rgba(15,23,42,0.15);
+  --accent: #2563eb; --accent-bg: #eff6ff; --accent-text: #1d4ed8;
+  --radius: 10px; --radius-lg: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.05),0 2px 4px -2px rgba(0,0,0,0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08),0 4px 6px -4px rgba(0,0,0,0.08);
+  --transition: all 0.2s cubic-bezier(0.4,0,0.2,1);
+  --success-bg:#dcfce7;--success-text:#15803d;
+  --danger-bg:#fee2e2;--danger-text:#b91c1c;
+  --grid-line: rgba(15,23,42,0.06);
+  --c-blue:#2563eb;--c-purple:#7c3aed;--c-green:#16a34a;--c-orange:#d97706;--c-pink:#db2777;--c-teal:#0d9488;--c-red:#dc2626;
+}
+@media (prefers-color-scheme:dark) {
+  :root {
+    --bg:#0b0f19;--bg-secondary:#161f30;--bg-tertiary:#0f1322;
+    --text:#f8fafc;--text-muted:#94a3b8;--text-hint:#64748b;
+    --border:rgba(255,255,255,0.06);--border-strong:rgba(255,255,255,0.12);
+    --accent:#3b82f6;--accent-bg:rgba(59,130,246,0.1);--accent-text:#60a5fa;
+    --success-bg:rgba(34,197,94,0.12);--success-text:#4ade80;
+    --danger-bg:rgba(239,68,68,0.12);--danger-text:#f87171;
+    --grid-line: rgba(255,255,255,0.06);
+  }
+}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg-tertiary);color:var(--text);min-height:100vh;}
+header{background:rgba(255,255,255,0.75);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 24px;height:64px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;flex-wrap:wrap;gap:8px;}
+@media(prefers-color-scheme:dark){header{background:rgba(11,15,25,0.75);}}
+.logo{font-family:'Outfit',sans-serif;font-size:18px;font-weight:700;color:var(--text);text-decoration:none;letter-spacing:-0.03em;}
+.logo span{color:var(--accent);}
+.nav-link{font-size:13px;font-weight:500;color:var(--text-muted);text-decoration:none;padding:8px 16px;border:1px solid var(--border-strong);border-radius:var(--radius);transition:var(--transition);display:flex;align-items:center;gap:6px;background:var(--bg);}
+.nav-link:hover{background:var(--bg-secondary);color:var(--text);box-shadow:var(--shadow-sm);}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:9px 16px;font-size:13px;font-weight:600;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--bg);color:var(--text);cursor:pointer;transition:var(--transition);box-shadow:var(--shadow-sm);}
+.btn:hover{background:var(--bg-secondary);box-shadow:var(--shadow-md);}
+main{max-width:1180px;margin:0 auto;padding:32px 20px 80px;}
+h1{font-family:'Outfit',sans-serif;font-size:26px;font-weight:700;margin-bottom:6px;letter-spacing:-0.02em;}
+.subtitle{font-size:14px;color:var(--text-muted);margin-bottom:24px;line-height:1.5;}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:24px;}
+.toolbar select{padding:9px 12px;font-size:13px;font-weight:500;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);cursor:pointer;outline:none;}
+.toolbar select:focus{border-color:var(--accent);}
+/* Stat strip */
+.stat-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.stat-box{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 18px;box-shadow:var(--shadow-sm);}
+.stat-box-value{font-family:'Outfit',sans-serif;font-size:22px;font-weight:700;margin-bottom:2px;}
+.stat-box-label{font-size:11.5px;color:var(--text-hint);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;}
+/* Card */
+.card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;margin-bottom:20px;box-shadow:var(--shadow-md);}
+.card-title{font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.card-subtitle{font-size:12.5px;color:var(--text-hint);margin-bottom:18px;}
+.chart-wrap{position:relative;height:280px;}
+.chart-wrap.tall{height:340px;}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+@media(max-width:860px){.grid-2{grid-template-columns:1fr;}.stat-strip{grid-template-columns:1fr 1fr;}}
+/* Funnel */
+.funnel{display:flex;flex-direction:column;gap:8px;}
+.funnel-row{display:flex;align-items:center;gap:12px;}
+.funnel-label{width:140px;flex-shrink:0;font-size:12.5px;font-weight:600;color:var(--text-muted);text-align:right;}
+.funnel-bar-wrap{flex:1;background:var(--bg-tertiary);border-radius:8px;height:34px;overflow:hidden;position:relative;}
+.funnel-bar-fill{height:100%;border-radius:8px;display:flex;align-items:center;padding-left:12px;color:#fff;font-size:12.5px;font-weight:700;transition:width 0.5s cubic-bezier(0.4,0,0.2,1);white-space:nowrap;}
+.funnel-pct{width:50px;flex-shrink:0;font-size:12px;font-weight:700;color:var(--text-hint);}
+/* Leaderboard table */
+.lb-table{width:100%;border-collapse:collapse;font-size:13px;}
+.lb-table th{text-align:left;padding:9px 10px;font-size:11px;font-weight:700;color:var(--text-hint);text-transform:uppercase;letter-spacing:0.04em;border-bottom:1px solid var(--border);}
+.lb-table td{padding:10px 10px;border-bottom:1px solid var(--border);color:var(--text);}
+.lb-table tr:last-child td{border-bottom:none;}
+.lb-bar-cell{display:flex;align-items:center;gap:8px;}
+.lb-mini-bar-wrap{flex:1;height:6px;background:var(--bg-tertiary);border-radius:3px;overflow:hidden;min-width:50px;}
+.lb-mini-bar-fill{height:100%;border-radius:3px;background:var(--accent);}
+.empty-note{font-size:13px;color:var(--text-hint);padding:30px 0;text-align:center;}
+.loading-note{font-size:13px;color:var(--text-hint);padding:30px 0;text-align:center;}
+@media(max-width:600px){
+  main{padding:20px 14px 60px;}
+  h1{font-size:22px;}
+  .card{padding:18px 16px;}
+  .funnel-label{width:100px;font-size:11.5px;}
+}
+</style>
+</head>
+<body>
+<header>
+  <a class="logo" href="index.html">Navain <span>AI</span></a>
+  <div style="display:flex;gap:12px;align-items:center;">
+    <span id="user-display" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
+    <a class="nav-link" href="admin.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+      Admin
+    </a>
+    <a class="nav-link" href="index.html">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      Back to tracker
+    </a>
+    <button class="btn" onclick="logout()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Logout
+    </button>
+  </div>
+</header>
+
+<main>
+  <h1>📊 Dashboard</h1>
+  <p class="subtitle">Team-wide performance analytics, built from your live leads database.</p>
+
+  <div class="toolbar">
+    <select id="filter-range" onchange="renderAll()">
+      <option value="7">Last 7 days</option>
+      <option value="14">Last 14 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="90">Last 90 days</option>
+      <option value="all">All time</option>
+    </select>
+    <select id="filter-agent" onchange="renderAll()">
+      <option value="">All Agents</option>
+    </select>
+    <button class="btn" onclick="loadDashboardData()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      Refresh
+    </button>
+  </div>
+
+  <div id="dashboard-content">
+    <div class="loading-note">Loading dashboard data…</div>
+  </div>
+</main>
+
+<script type="module">
+import { db, auth } from './firebase-init.js';
+import { collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+
+const STATUS_COLOR_MAP = {
+  'Not Called':'#94a3b8','No Answer':'#d97706','Voicemail':'#4f46e5','Interested':'#16a34a',
+  'Not Interested':'#dc2626','Callback Scheduled':'#2563eb','Wrong Number':'#db2777'
+};
+const PALETTE = ['#2563eb','#7c3aed','#16a34a','#d97706','#db2777','#0d9488','#dc2626','#0891b2','#65a30d','#9333ea'];
+
+let currentUser = null;
+let userRole = null;
+let allLeads = [];
+let employees = [];
+let charts = {}; // keep references so we can destroy before re-render
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function isDark() { return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches; }
+function cssVar(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) { window.location.href = 'login.html'; return; }
+  userRole = localStorage.getItem('user_role');
+  if (userRole !== 'admin') {
+    // Dashboard is an admin-only analytics view
+    window.location.href = 'index.html';
+    return;
+  }
+  currentUser = user;
+  const userName = localStorage.getItem('user_name') || 'User';
+  document.getElementById('user-display').textContent = userName + ' (Admin)';
+  await loadDashboardData();
+});
+
+window.logout = async () => {
+  try { await signOut(auth); localStorage.clear(); window.location.href = 'login.html'; }
+  catch(err) { console.error(err); }
+};
+
+window.loadDashboardData = async function() {
+  document.getElementById('dashboard-content').innerHTML = '<div class="loading-note">Loading dashboard data…</div>';
+  try {
+    const [leadsSnap, usersSnap] = await Promise.all([
+      getDocs(collection(db, 'leads')),
+      getDocs(collection(db, 'users'))
+    ]);
+    allLeads = leadsSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+    employees = usersSnap.docs.map(d => d.data());
+
+    const agentSel = document.getElementById('filter-agent');
+    const cur = agentSel.value;
+    agentSel.innerHTML = '<option value="">All Agents</option>' +
+      employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+'</option>').join('');
+    agentSel.value = cur;
+
+    buildDashboardSkeleton();
+    renderAll();
+  } catch(e) {
+    document.getElementById('dashboard-content').innerHTML = '<div class="empty-note">Error loading data: ' + esc(e.message) + '</div>';
+  }
+};
+
+function buildDashboardSkeleton() {
+  document.getElementById('dashboard-content').innerHTML = `
+    <div class="stat-strip" id="stat-strip"></div>
+
+    <div class="card">
+      <div class="card-title">📞 Calls Per Day</div>
+      <div class="card-subtitle">Number of call attempts logged by the team each day in the selected range.</div>
+      <div class="chart-wrap"><canvas id="chart-calls-per-day"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">🎯 Conversion Funnel</div>
+      <div class="card-subtitle">How leads move from first contact to a positive response.</div>
+      <div class="funnel" id="funnel-container"></div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">🏙️ Interested % by City</div>
+        <div class="card-subtitle">Top cities ranked by interest rate (min. 3 calls).</div>
+        <div class="chart-wrap"><canvas id="chart-city"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">🏷️ Interested % by Niche</div>
+        <div class="card-subtitle">Top industries ranked by interest rate (min. 3 calls).</div>
+        <div class="chart-wrap"><canvas id="chart-niche"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">👤 Interested % by Agent</div>
+      <div class="card-subtitle">Each agent's interest rate vs. their total assigned leads.</div>
+      <div class="chart-wrap"><canvas id="chart-agent"></canvas></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📋 Status Breakdown</div>
+      <div class="card-subtitle">All leads in the tracker by current call status.</div>
+      <div class="chart-wrap"><canvas id="chart-status"></canvas></div>
+    </div>
+  `;
+}
+
+// ── Helpers
+function filteredCallLogEntries(rangeDays, agentUid) {
+  const entries = [];
+  allLeads.forEach(lead => {
+    if (agentUid && lead.assignedTo !== agentUid) return;
+    (Array.isArray(lead._callLog) ? lead._callLog : []).forEach(c => {
+      entries.push({ ...c, leadId: lead.id });
+    });
+  });
+  if (rangeDays === 'all') return entries;
+  const cutoff = Date.now() - (parseInt(rangeDays,10) * 86400000);
+  return entries.filter(e => e.ts && new Date(e.ts).getTime() >= cutoff);
+}
+
+function leadsForAgent(agentUid) {
+  return agentUid ? allLeads.filter(l => l.assignedTo === agentUid) : allLeads;
+}
+
+function destroyChart(key) {
+  if (charts[key]) { charts[key].destroy(); delete charts[key]; }
+}
+
+function chartTextColor() { return isDark() ? '#94a3b8' : '#475569'; }
+function chartGridColor() { return isDark() ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)'; }
+
+// ── Main render
+window.renderAll = function() {
+  const rangeDays = document.getElementById('filter-range').value;
+  const agentUid = document.getElementById('filter-agent').value;
+
+  const scopedLeads = leadsForAgent(agentUid);
+  const callEntries = filteredCallLogEntries(rangeDays, agentUid);
+
+  renderStatStrip(scopedLeads, callEntries);
+  renderCallsPerDay(callEntries, rangeDays);
+  renderFunnel(scopedLeads);
+  renderRateChart('chart-city', scopedLeads, l => l.city || l['City'] || '', 'city');
+  renderRateChart('chart-niche', scopedLeads, l => l.industry || l['Industry'] || '', 'niche');
+  renderAgentChart(rangeDays);
+  renderStatusChart(scopedLeads);
+};
+
+function renderStatStrip(scopedLeads, callEntries) {
+  const total = scopedLeads.length;
+  const called = scopedLeads.filter(l => l._status && l._status !== 'Not Called').length;
+  const interested = scopedLeads.filter(l => l._status === 'Interested').length;
+  const closedWon = scopedLeads.filter(l => l._pipelineStage === 'Closed Won').length;
+  const intRate = total > 0 ? Math.round((interested/total)*100) : 0;
+
+  const stats = [
+    { label: 'Total Leads', value: total, color: 'var(--accent)' },
+    { label: 'Calls Logged (range)', value: callEntries.length, color: 'var(--c-orange)' },
+    { label: 'Called', value: called, color: 'var(--c-purple)' },
+    { label: 'Interested', value: interested, color: 'var(--success-text)' },
+    { label: 'Interest Rate', value: intRate + '%', color: 'var(--success-text)' },
+    { label: 'Closed Won', value: closedWon, color: 'var(--c-teal)' },
+  ];
+  document.getElementById('stat-strip').innerHTML = stats.map(s =>
+    '<div class="stat-box"><div class="stat-box-value" style="color:'+s.color+';">'+s.value+'</div><div class="stat-box-label">'+s.label+'</div></div>'
+  ).join('');
+}
+
+function renderCallsPerDay(callEntries, rangeDays) {
+  const days = rangeDays === 'all' ? 30 : parseInt(rangeDays, 10);
+  const labels = [];
+  const counts = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0,10);
+    labels.push(d.toLocaleDateString('en-US', {month:'short', day:'numeric'}));
+    counts.push(callEntries.filter(e => e.ts && e.ts.slice(0,10) === key).length);
+  }
+  destroyChart('callsPerDay');
+  const ctx = document.getElementById('chart-calls-per-day');
+  charts.callsPerDay = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Calls', data: counts, backgroundColor: '#2563eb', borderRadius: 4, maxBarThickness: 28 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: chartTextColor(), maxRotation: 0, autoSkip: true, font: {size: 11} } },
+        y: { beginAtZero: true, ticks: { precision: 0, color: chartTextColor() }, grid: { color: chartGridColor() } }
+      }
+    }
+  });
+}
+
+function renderFunnel(scopedLeads) {
+  const stages = [
+    { key: 'notCalled', label: 'Not Called', count: scopedLeads.length, color: '#94a3b8' },
+    { key: 'interested', label: 'Interested', count: scopedLeads.filter(l => l._status === 'Interested' || ['Demo Scheduled','Proposal Sent','Closed Won','Closed Lost'].includes(l._pipelineStage)).length, color: '#16a34a' },
+    { key: 'demo', label: 'Demo Scheduled', count: scopedLeads.filter(l => ['Demo Scheduled','Proposal Sent','Closed Won','Closed Lost'].includes(l._pipelineStage)).length, color: '#4f46e5' },
+    { key: 'proposal', label: 'Proposal Sent', count: scopedLeads.filter(l => ['Proposal Sent','Closed Won','Closed Lost'].includes(l._pipelineStage)).length, color: '#d97706' },
+    { key: 'closed', label: 'Closed', count: scopedLeads.filter(l => l._pipelineStage === 'Closed Won' || l._pipelineStage === 'Closed Lost').length, color: '#0d9488' },
+  ];
+  const max = stages[0].count || 1;
+  document.getElementById('funnel-container').innerHTML = stages.map(s => {
+    const pct = max > 0 ? Math.round((s.count/max)*100) : 0;
+    const widthPct = Math.max(pct, s.count > 0 ? 6 : 0);
+    return '<div class="funnel-row">' +
+      '<div class="funnel-label">'+esc(s.label)+'</div>' +
+      '<div class="funnel-bar-wrap"><div class="funnel-bar-fill" style="width:'+widthPct+'%;background:'+s.color+';">'+(s.count>0?s.count:'')+'</div></div>' +
+      '<div class="funnel-pct">'+pct+'%</div>' +
+    '</div>';
+  }).join('');
+}
+
+function renderRateChart(canvasId, scopedLeads, getKeyFn, chartKey) {
+  const groups = {};
+  scopedLeads.forEach(l => {
+    const key = (getKeyFn(l) || '').trim();
+    if (!key) return;
+    if (!groups[key]) groups[key] = { total: 0, interested: 0 };
+    groups[key].total++;
+    if (l._status === 'Interested') groups[key].interested++;
+  });
+  let rows = Object.entries(groups)
+    .filter(([,v]) => v.total >= 3)
+    .map(([k,v]) => ({ name: k, rate: Math.round((v.interested/v.total)*100), total: v.total }))
+    .sort((a,b) => b.rate - a.rate)
+    .slice(0, 8);
+
+  destroyChart(chartKey);
+  const ctx = document.getElementById(canvasId);
+  if (!rows.length) {
+    ctx.parentElement.innerHTML = '<div class="empty-note">Not enough data yet (need 3+ calls per group).</div>';
+    return;
+  }
+  charts[chartKey] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.name + ' ('+r.total+')'),
+      datasets: [{ label: 'Interested %', data: rows.map(r => r.rate), backgroundColor: PALETTE, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%', color: chartTextColor() }, grid: { color: chartGridColor() } },
+        y: { grid: { display: false }, ticks: { color: chartTextColor(), font: {size: 11.5} } }
+      }
+    }
+  });
+}
+
+function renderAgentChart(rangeDays) {
+  destroyChart('agent');
+  const ctx = document.getElementById('chart-agent');
+  if (!employees.length) {
+    ctx.parentElement.innerHTML = '<div class="empty-note">No agents yet.</div>';
+    return;
+  }
+  const rows = employees.map(emp => {
+    const empLeads = allLeads.filter(l => l.assignedTo === emp.uid);
+    const total = empLeads.length;
+    const interested = empLeads.filter(l => l._status === 'Interested').length;
+    return { name: emp.name, rate: total > 0 ? Math.round((interested/total)*100) : 0, total };
+  }).filter(r => r.total > 0).sort((a,b) => b.rate - a.rate);
+
+  if (!rows.length) {
+    ctx.parentElement.innerHTML = '<div class="empty-note">No leads assigned yet.</div>';
+    return;
+  }
+  charts.agent = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: rows.map(r => r.name + ' ('+r.total+')'),
+      datasets: [{ label: 'Interested %', data: rows.map(r => r.rate), backgroundColor: '#16a34a', borderRadius: 4, maxBarThickness: 36 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: false }, ticks: { color: chartTextColor(), font: {size: 11.5} } },
+        y: { beginAtZero: true, max: 100, ticks: { callback: v => v+'%', color: chartTextColor() }, grid: { color: chartGridColor() } }
+      }
+    }
+  });
+}
+
+function renderStatusChart(scopedLeads) {
+  destroyChart('status');
+  const ctx = document.getElementById('chart-status');
+  const statuses = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
+  const counts = statuses.map(s => scopedLeads.filter(l => l._status === s).length);
+  const nonZero = statuses.map((s,i) => ({s, c: counts[i]})).filter(x => x.c > 0);
+  if (!nonZero.length) {
+    ctx.parentElement.innerHTML = '<div class="empty-note">No leads yet.</div>';
+    return;
+  }
+  charts.status = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: nonZero.map(x => x.s),
+      datasets: [{ data: nonZero.map(x => x.c), backgroundColor: nonZero.map(x => STATUS_COLOR_MAP[x.s]) }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'right', labels: { color: chartTextColor(), font: {size: 12}, padding: 14 } } }
+    }
+  });
+}
+</script>
+</body>
+</html>
