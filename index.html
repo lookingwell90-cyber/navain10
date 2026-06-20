@@ -311,6 +311,10 @@ tr:hover td{background:var(--bg-secondary);}
       <option value="">Reassign to…</option>
     </select>
     <button class="btn btn-accent" style="padding:6px 14px;font-size:12px;" onclick="applyBulkReassign()">Apply</button>
+    <select id="bulk-status-select" style="padding:6px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;">
+      <option value="">Set status…</option>
+    </select>
+    <button class="btn btn-accent" style="padding:6px 14px;font-size:12px;" onclick="applyBulkStatus()">Apply</button>
     <button class="btn" style="padding:6px 12px;font-size:12px;" onclick="clearBulkSelect()">Clear</button>
   </div>
 
@@ -344,6 +348,13 @@ tr:hover td{background:var(--bg-secondary);}
       <option value="status">By Status</option>
       <option value="callback">By Callback Date</option>
     </select>
+    <div style="position:relative;">
+      <button class="btn" type="button" id="columns-toggle-btn" onclick="toggleColumnsPanel(event)" style="padding:8px 12px;font-size:13px;">Columns ▾</button>
+      <div id="columns-panel" class="hidden" style="position:absolute;top:calc(100% + 6px);right:0;z-index:50;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,.15);padding:10px 12px;min-width:170px;">
+        <div style="font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:6px;">Show columns</div>
+        <div id="columns-panel-list" style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;"></div>
+      </div>
+    </div>
   </div>
 
   <p class="result-count" id="result-count"></p>
@@ -450,6 +461,72 @@ import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDo
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const STATUSES = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
+
+// ── Column Visibility Toggle (saved to localStorage)
+// nth-child index (1-based, includes checkbox col) -> label. Checkbox(1), #(2), Business(3) and Actions(15) always stay visible.
+const TOGGLEABLE_COLUMNS = [
+  {n:4,  label:'Link'},
+  {n:5,  label:'Contact'},
+  {n:6,  label:'Phone'},
+  {n:7,  label:'City'},
+  {n:8,  label:'Province'},
+  {n:9,  label:'Niche'},
+  {n:11, label:'Callback Date'},
+  {n:12, label:'Note'},
+  {n:13, label:'Assigned'},
+  {n:14, label:'Updated'},
+];
+function getHiddenColumns() {
+  try { return JSON.parse(localStorage.getItem('hidden_columns') || '[]'); } catch(e) { return []; }
+}
+function setHiddenColumns(arr) {
+  localStorage.setItem('hidden_columns', JSON.stringify(arr));
+}
+function applyColumnVisibility() {
+  const hidden = getHiddenColumns();
+  let styleTag = document.getElementById('column-visibility-style');
+  if (!styleTag) {
+    styleTag = document.createElement('style');
+    styleTag.id = 'column-visibility-style';
+    document.head.appendChild(styleTag);
+  }
+  styleTag.textContent = hidden.map(n => '#leads-table th:nth-child('+n+'), #leads-table td:nth-child('+n+'){display:none;}').join('\n');
+}
+function renderColumnsPanelList() {
+  const hidden = getHiddenColumns();
+  const list = document.getElementById('columns-panel-list');
+  if (!list) return;
+  list.innerHTML = TOGGLEABLE_COLUMNS.map(c =>
+    '<label style="display:flex;align-items:center;gap:7px;font-size:12.5px;cursor:pointer;">' +
+      '<input type="checkbox" data-col="'+c.n+'" '+(hidden.includes(c.n)?'':'checked')+' onchange="onColumnToggle(this)">' +
+      esc(c.label) +
+    '</label>'
+  ).join('');
+}
+window.onColumnToggle = function(cb) {
+  const n = parseInt(cb.dataset.col, 10);
+  let hidden = getHiddenColumns();
+  if (cb.checked) hidden = hidden.filter(x => x !== n);
+  else if (!hidden.includes(n)) hidden.push(n);
+  setHiddenColumns(hidden);
+  applyColumnVisibility();
+};
+window.toggleColumnsPanel = function(e) {
+  e.stopPropagation();
+  const panel = document.getElementById('columns-panel');
+  const isHidden = panel.classList.contains('hidden');
+  if (isHidden) { renderColumnsPanelList(); panel.classList.remove('hidden'); }
+  else panel.classList.add('hidden');
+};
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('columns-panel');
+  if (!panel || panel.classList.contains('hidden')) return;
+  if (panel.contains(e.target)) return;
+  if (e.target.closest('#columns-toggle-btn')) return;
+  panel.classList.add('hidden');
+});
+applyColumnVisibility();
+
 const STATUS_COLORS = {
   'Not Called':         {bg:'var(--s-not-called-bg)',   text:'var(--s-not-called-text)'},
   'No Answer':          {bg:'var(--s-no-answer-bg)',    text:'var(--s-no-answer-text)'},
@@ -658,6 +735,10 @@ function populateFilters() {
   provEl.innerHTML = '<option value="">All Provinces</option>' + provinces.map(p => '<option>'+esc(p)+'</option>').join('');
   nicheEl.innerHTML = '<option value="">All Niches</option>' + niches.map(n => '<option>'+esc(n)+'</option>').join('');
   cityEl.value = sc; provEl.value = sp; nicheEl.value = sn;
+  const bulkStatusEl = document.getElementById('bulk-status-select');
+  if (bulkStatusEl && bulkStatusEl.options.length <= 1) {
+    bulkStatusEl.innerHTML = '<option value="">Set status…</option>' + STATUSES.map(s => '<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
+  }
 }
 
 // ── Pills
@@ -702,7 +783,8 @@ window.renderTable = function() {
       if (fCallback === 'today' && cs !== 'today') return false;
     }
     if (q) {
-      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email')].join(' ').toLowerCase();
+      const historyText = Array.isArray(l._notesHistory) ? l._notesHistory.map(e => e.text||'').join(' ') : '';
+      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -887,6 +969,10 @@ window.clearBulkSelect = function() {
   document.querySelectorAll('.lead-cb').forEach(c => c.checked = false);
   const allCb = document.getElementById('select-all-cb');
   if (allCb) allCb.checked = false;
+  const bulkStatusEl = document.getElementById('bulk-status-select');
+  if (bulkStatusEl) bulkStatusEl.value = '';
+  const bulkReassignEl = document.getElementById('bulk-reassign-select');
+  if (bulkReassignEl) bulkReassignEl.value = '';
   updateBulkBar();
 };
 window.applyBulkReassign = async function() {
@@ -904,6 +990,24 @@ window.applyBulkReassign = async function() {
     }
     await b.commit();
     showToast('✓ ' + selectedLeadIds.size + ' leads reassigned to ' + empName);
+    clearBulkSelect();
+  } catch(e) { showToast('Error: ' + e.message); }
+};
+window.applyBulkStatus = async function() {
+  const status = document.getElementById('bulk-status-select').value;
+  if (!status || selectedLeadIds.size === 0) { showToast('Select a status and leads first'); return; }
+  showToast('Updating status…');
+  try {
+    let b = writeBatch(db); let count = 0;
+    for (const id of selectedLeadIds) {
+      const updates = { _status: status, _updatedAt: serverTimestamp() };
+      if (status !== 'Callback Scheduled') updates._callbackDate = '';
+      b.update(doc(db,'leads',id), updates);
+      count++;
+      if (count % 499 === 0) { await b.commit(); b = writeBatch(db); }
+    }
+    await b.commit();
+    showToast('✓ ' + selectedLeadIds.size + ' leads marked "' + status + '"');
     clearBulkSelect();
   } catch(e) { showToast('Error: ' + e.message); }
 };
@@ -1219,7 +1323,8 @@ window.exportCSV = function() {
       if (fCallback === 'today' && cs !== 'today') return false;
     }
     if (q) {
-      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email')].join(' ').toLowerCase();
+      const historyText = Array.isArray(l._notesHistory) ? l._notesHistory.map(e => e.text||'').join(' ') : '';
+      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
