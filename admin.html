@@ -555,6 +555,10 @@
         <tbody id="preview-body"></tbody>
       </table>
     </div>
+    <div id="dupe-skip-wrap" style="display:none;align-items:center;gap:8px;margin-bottom:10px;">
+      <input type="checkbox" id="skip-dupes" checked style="margin:0;">
+      <label for="skip-dupes" style="font-size:13px;color:var(--text-muted);cursor:pointer;">Skip duplicate phone numbers</label>
+    </div>
     <div class="actions">
       <button class="btn btn-primary" id="publish-btn" onclick="publishLeads()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
@@ -569,6 +573,10 @@
 </main>
 
 <div class="toast" id="toast"></div>
+<div class="toast" id="undo-toast" style="display:none;align-items:center;gap:16px;">
+  <span id="undo-toast-msg"></span>
+  <button onclick="undoLastImport()" style="background:none;border:none;color:#60a5fa;font-weight:700;cursor:pointer;font-size:14px;padding:0;">UNDO</button>
+</div>
 
 <script type="module">
 import { db, auth, firebaseConfig } from './firebase-init.js';
@@ -1333,7 +1341,28 @@ window.cancelMapping = function() {
   document.getElementById('file-input').value = '';
 };
 
-window.applyMapping = function() {
+function normPhone(p) { return String(p||'').replace(/\D/g,''); }
+
+async function computeDupes(list) {
+  let existingPhones = new Set();
+  try {
+    const snap = await getDocs(collection(db, 'leads'));
+    existingPhones = new Set(snap.docs.map(d => normPhone(d.data().phone)).filter(Boolean));
+  } catch(e) { console.error('Dupe check failed to load existing leads', e); }
+  const seenInBatch = new Map();
+  return list.map(lead => {
+    const np = normPhone(lead.phone);
+    if (!np) return { ...lead, _dupType: null };
+    const inBatchCount = (seenInBatch.get(np) || 0) + 1;
+    seenInBatch.set(np, inBatchCount);
+    let dupType = null;
+    if (existingPhones.has(np)) dupType = 'existing';
+    else if (inBatchCount > 1) dupType = 'batch';
+    return { ...lead, _dupType: dupType };
+  });
+}
+
+window.applyMapping = async function() {
   const mapping = {};
   TRACKER_FIELDS.forEach(f => {
     const val = document.getElementById('map-' + f.key).value;
@@ -1348,6 +1377,9 @@ window.applyMapping = function() {
     return lead;
   });
 
+  showToast('Checking for duplicates…');
+  parsedLeads = await computeDupes(parsedLeads);
+
   renderPreview();
 };
 
@@ -1355,20 +1387,26 @@ function renderPreview() {
   const displayFields = TRACKER_FIELDS.filter(f => parsedLeads[0] && parsedLeads[0][f.key] !== undefined);
   const head = document.getElementById('preview-head');
   const body = document.getElementById('preview-body');
-  head.innerHTML = '<tr>' + displayFields.map(f => `<th>${f.label}</th>`).join('') + '</tr>';
+  head.innerHTML = '<tr><th></th>' + displayFields.map(f => `<th>${f.label}</th>`).join('') + '</tr>';
   const sample = parsedLeads.slice(0, 15);
-  body.innerHTML = sample.map(row =>
-    '<tr>' + displayFields.map(f => {
+  body.innerHTML = sample.map(row => {
+    const dupBadge = row._dupType
+      ? '<span style="font-size:10.5px;font-weight:700;color:#dc2626;background:#fee2e2;padding:2px 7px;border-radius:8px;white-space:nowrap;">'+(row._dupType==='existing'?'Already exists':'Dup in file')+'</span>'
+      : '';
+    return '<tr' + (row._dupType ? ' style="background:#fef2f2;"' : '') + '>' + '<td>'+dupBadge+'</td>' + displayFields.map(f => {
       const val = row[f.key] || '';
       const isUrl = val.startsWith('http');
       const display = isUrl ? '<a href="' + esc(val) + '" target="_blank" style="color:var(--accent);text-decoration:none;">' + esc(val.replace(/^https?:\/\//, '').substring(0, 30)) + '…</a>' : esc(val || '—');
       return `<td title="${esc(val)}">${display}</td>`;
-    }).join('') + '</tr>'
-  ).join('');
+    }).join('') + '</tr>';
+  }).join('');
   if (parsedLeads.length > 15) {
-    body.innerHTML += `<tr><td colspan="${displayFields.length}" style="text-align:center;color:var(--text-hint);font-size:12px;padding:10px;">… and ${parsedLeads.length - 15} more rows</td></tr>`;
+    body.innerHTML += `<tr><td colspan="${displayFields.length + 1}" style="text-align:center;color:var(--text-hint);font-size:12px;padding:10px;">… and ${parsedLeads.length - 15} more rows</td></tr>`;
   }
-  document.getElementById('preview-count').textContent = parsedLeads.length + ' lead' + (parsedLeads.length !== 1 ? 's' : '');
+  const dupCount = parsedLeads.filter(l => l._dupType).length;
+  document.getElementById('preview-count').textContent = parsedLeads.length + ' lead' + (parsedLeads.length !== 1 ? 's' : '') + (dupCount ? ' • ' + dupCount + ' duplicate' + (dupCount !== 1 ? 's' : '') + ' detected' : '');
+  const dupeWrap = document.getElementById('dupe-skip-wrap');
+  if (dupeWrap) dupeWrap.style.display = dupCount ? 'flex' : 'none';
   document.getElementById('mapping-section').style.display = 'none';
   document.getElementById('preview-section').style.display = 'block';
 }
@@ -1383,7 +1421,7 @@ window.cancelPreview = function() {
 window.publishLeads = async function() {
   try {
     showToast('Publishing…');
-    
+
     let assignedTo = '';
     let assignedName = '';
 
@@ -1396,31 +1434,78 @@ window.publishLeads = async function() {
       assignedName = localStorage.getItem('user_name') || '';
     }
 
+    const skipDupesCb = document.getElementById('skip-dupes');
+    const toPublish = (skipDupesCb && skipDupesCb.checked) ? parsedLeads.filter(l => !l._dupType) : parsedLeads;
+    if (!toPublish.length) { showAlert('All rows are duplicates — nothing to upload.', 'danger'); return; }
+
     // Write new leads in batches of 500
     let count = 0;
     let b = writeBatch(db);
-    for (const lead of parsedLeads) {
+    const newIds = [];
+    for (const lead of toPublish) {
       const ref = doc(collection(db, 'leads'));
-      b.set(ref, { 
-        ...lead, 
+      const { _dupType, ...cleanLead } = lead;
+      b.set(ref, {
+        ...cleanLead,
         assignedTo: assignedTo,
         assignedName: assignedName,
-        _id: ref.id, 
-        _createdAt: new Date().toISOString() 
+        _id: ref.id,
+        _createdAt: new Date().toISOString()
       });
+      newIds.push(ref.id);
       count++;
       if (count % 499 === 0) { await b.commit(); b = writeBatch(db); }
     }
     await b.commit();
 
-    showToast('✓ ' + parsedLeads.length + ' leads published!');
     document.getElementById('preview-section').style.display = 'none';
     parsedLeads = [];
     document.getElementById('file-input').value = '';
     document.getElementById('csv-assignee').value = '';
     showCurrentCount();
+
+    lastImportIds = newIds;
+    showUndoToast(newIds.length);
   } catch(e) {
     showAlert('Error publishing: ' + e.message, 'danger');
+  }
+};
+
+// ── Import Undo (30s window)
+let lastImportIds = [];
+let undoToastTimer = null;
+function showUndoToast(count) {
+  const t = document.getElementById('undo-toast');
+  document.getElementById('undo-toast-msg').textContent = '✓ ' + count + ' lead' + (count !== 1 ? 's' : '') + ' published';
+  t.style.display = 'flex';
+  t.classList.add('show');
+  if (undoToastTimer) clearTimeout(undoToastTimer);
+  undoToastTimer = setTimeout(hideUndoToast, 30000);
+}
+function hideUndoToast() {
+  const t = document.getElementById('undo-toast');
+  t.classList.remove('show');
+  setTimeout(() => { if (!t.classList.contains('show')) t.style.display = 'none'; }, 300);
+  lastImportIds = [];
+}
+window.undoLastImport = async function() {
+  if (!lastImportIds.length) return;
+  const ids = lastImportIds;
+  if (undoToastTimer) clearTimeout(undoToastTimer);
+  hideUndoToast();
+  try {
+    let b = writeBatch(db);
+    let count = 0;
+    for (const id of ids) {
+      b.delete(doc(db, 'leads', id));
+      count++;
+      if (count % 499 === 0) { await b.commit(); b = writeBatch(db); }
+    }
+    await b.commit();
+    showToast('✓ Import undone — ' + ids.length + ' lead' + (ids.length !== 1 ? 's' : '') + ' removed');
+    showCurrentCount();
+  } catch(e) {
+    showAlert('Error undoing import: ' + e.message, 'danger');
   }
 };
 
