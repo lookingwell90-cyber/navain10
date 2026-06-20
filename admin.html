@@ -282,6 +282,12 @@
   }
   #mapping-section { display: none; }
   .hidden { display: none !important; }
+  .activity-entry { display: flex; gap: 10px; padding: 11px 4px; border-bottom: 1px solid var(--border); }
+  .activity-entry:last-child { border-bottom: none; }
+  .activity-dot { width: 8px; height: 8px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .activity-entry-text { font-size: 13px; color: var(--text); line-height: 1.5; }
+  .activity-entry-text strong { font-weight: 700; }
+  .activity-entry-meta { font-size: 11.5px; color: var(--text-hint); margin-top: 2px; }
    @media (max-width: 600px) { 
      .col-map { grid-template-columns: 1fr; } 
      main { padding: 24px 16px 60px; } 
@@ -295,6 +301,10 @@
   <a class="logo" href="index.html">Navain <span>AI</span></a>
   <div style="display: flex; gap: 12px; align-items: center;">
     <span id="user-display" style="font-size: 13px; font-weight: 600; color: var(--text-muted);"></span>
+    <a class="nav-link" href="dashboard.html" id="dashboard-nav-link">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      Dashboard
+    </a>
     <a class="nav-link" href="index.html">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
       Back to tracker
@@ -330,6 +340,31 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
         Delete Selected Employee's Leads
       </button>
+    </div>
+  </div>
+
+  <!-- Lead Activity Feed -->
+  <div class="card" id="activity-feed-card">
+    <div class="card-title">
+      Recent Activity
+      <button class="btn" style="padding:6px 12px;font-size:12px;font-weight:600;text-transform:none;letter-spacing:normal;" onclick="loadActivityFeed()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+        Refresh
+      </button>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:16px;">A live log of calls and notes logged by the whole team, most recent first.</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
+      <select id="activity-filter-employee" onchange="renderActivityFeed()" style="padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12.5px;outline:none;cursor:pointer;">
+        <option value="">All Agents</option>
+      </select>
+      <select id="activity-filter-type" onchange="renderActivityFeed()" style="padding:7px 10px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:12.5px;outline:none;cursor:pointer;">
+        <option value="">Calls + Notes</option>
+        <option value="call">Calls Only</option>
+        <option value="note">Notes Only</option>
+      </select>
+    </div>
+    <div id="activity-feed-list" style="display:flex;flex-direction:column;gap:2px;max-height:420px;overflow-y:auto;">
+      <p style="font-size:13px;color:var(--text-hint);">Loading activity...</p>
     </div>
   </div>
 
@@ -621,15 +656,20 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('csv-assignee-group').classList.remove('hidden');
     document.getElementById('assign-leads-card').style.display = 'block';
     document.getElementById('assign-task-card').style.display = 'block';
+    document.getElementById('activity-feed-card').classList.remove('hidden');
+    document.getElementById('dashboard-nav-link').classList.remove('hidden');
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
     await loadSentTasks();
+    await loadActivityFeed();
   } else {
     document.getElementById('employee-manager-card').classList.add('hidden');
     document.getElementById('clear-leads-btn').classList.add('hidden');
     document.getElementById('csv-assignee-group').classList.add('hidden');
     document.getElementById('assign-task-card').style.display = 'none';
+    document.getElementById('activity-feed-card').classList.add('hidden');
+    document.getElementById('dashboard-nav-link').classList.add('hidden');
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.add('hidden');
   }
@@ -969,6 +1009,92 @@ window.deleteTask = async function(taskId) {
   } catch(e) {
     alert('Error deleting task: ' + e.message);
   }
+};
+
+// ── Lead Activity Feed: built from each lead's _callLog + _notesHistory arrays
+let activityFeedEntries = [];
+const ACTIVITY_STATUS_COLOR = {
+  'Not Called':'#94a3b8','No Answer':'#d97706','Voicemail':'#4f46e5','Interested':'#16a34a',
+  'Not Interested':'#dc2626','Callback Scheduled':'#2563eb','Wrong Number':'#db2777'
+};
+window.loadActivityFeed = async function() {
+  const listEl = document.getElementById('activity-feed-list');
+  if (!listEl) return;
+  listEl.innerHTML = '<p style="font-size:13px;color:var(--text-hint);">Loading activity...</p>';
+  try {
+    const snap = await getDocs(collection(db, 'leads'));
+    const allLeads = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const entries = [];
+    allLeads.forEach(lead => {
+      const bName = lead.businessName || lead['Business Name'] || 'Unknown business';
+      (Array.isArray(lead._callLog) ? lead._callLog : []).forEach(c => {
+        entries.push({
+          type: 'call', ts: c.ts, agentName: c.agentName || 'Agent',
+          leadId: lead.id, businessName: bName, outcome: c.outcome, note: c.note
+        });
+      });
+      (Array.isArray(lead._notesHistory) ? lead._notesHistory : []).forEach(n => {
+        entries.push({
+          type: 'note', ts: n.ts, agentName: n.agentName || 'Agent',
+          leadId: lead.id, businessName: bName, text: n.text
+        });
+      });
+    });
+    entries.sort((a,b) => (b.ts||'').localeCompare(a.ts||''));
+    activityFeedEntries = entries;
+
+    // Populate agent filter dropdown
+    const agentSel = document.getElementById('activity-filter-employee');
+    const agentNames = [...new Set(entries.map(e => e.agentName))].sort();
+    const curAgent = agentSel.value;
+    agentSel.innerHTML = '<option value="">All Agents</option>' + agentNames.map(n => '<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+    agentSel.value = curAgent;
+
+    renderActivityFeed();
+  } catch(e) {
+    listEl.innerHTML = '<p style="font-size:13px;color:var(--danger-text);">Error loading activity: ' + esc(e.message) + '</p>';
+  }
+};
+
+window.renderActivityFeed = function() {
+  const listEl = document.getElementById('activity-feed-list');
+  if (!listEl) return;
+  const fAgent = document.getElementById('activity-filter-employee').value;
+  const fType = document.getElementById('activity-filter-type').value;
+
+  let filtered = activityFeedEntries.filter(e => {
+    if (fAgent && e.agentName !== fAgent) return false;
+    if (fType && e.type !== fType) return false;
+    return true;
+  }).slice(0, 100);
+
+  if (!filtered.length) {
+    listEl.innerHTML = '<p style="font-size:13px;color:var(--text-hint);">No activity logged yet.</p>';
+    return;
+  }
+
+  listEl.innerHTML = filtered.map(e => {
+    const date = e.ts ? new Date(e.ts).toLocaleDateString('en-US',{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'}) : '';
+    if (e.type === 'call') {
+      const dotColor = ACTIVITY_STATUS_COLOR[e.outcome] || '#94a3b8';
+      const noteSuffix = e.note ? ' — "' + esc(e.note) + '"' : '';
+      return '<div class="activity-entry">' +
+        '<div class="activity-dot" style="background:'+dotColor+';"></div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="activity-entry-text"><strong>'+esc(e.agentName)+'</strong> → Logged call on <strong>'+esc(e.businessName)+'</strong> ('+esc(e.outcome)+')'+noteSuffix+'</div>' +
+          '<div class="activity-entry-meta">'+esc(date)+'</div>' +
+        '</div>' +
+      '</div>';
+    } else {
+      return '<div class="activity-entry">' +
+        '<div class="activity-dot" style="background:var(--accent);"></div>' +
+        '<div style="flex:1;min-width:0;">' +
+          '<div class="activity-entry-text"><strong>'+esc(e.agentName)+'</strong> → Added note on <strong>'+esc(e.businessName)+'</strong>: "'+esc(e.text)+'"</div>' +
+          '<div class="activity-entry-meta">'+esc(date)+'</div>' +
+        '</div>' +
+      '</div>';
+    }
+  }).join('');
 };
 
 function taskAlert(el, msg, type) {
