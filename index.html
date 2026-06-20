@@ -293,6 +293,9 @@ tr:hover td{background:var(--bg-secondary);}
 </header>
 
 <main>
+  <!-- Debug Error Banner (temporary diagnostic aid) -->
+  <div id="debug-error-banner" style="display:none;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12.5px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.5;"></div>
+
   <!-- Overdue Callback Banner -->
   <div class="callback-alert-banner" id="callback-banner">
     <span class="cab-icon">⚠️</span>
@@ -605,6 +608,23 @@ function f(lead, key) {
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function q(v) { return '"' + String(v||'').replace(/"/g,'""') + '"'; }
 
+// ── Temporary diagnostic helper: shows the real error on-screen (mobile has no console access)
+function showDebugError(label, err) {
+  const banner = document.getElementById('debug-error-banner');
+  if (!banner) return;
+  const code = err && err.code ? ' [' + err.code + ']' : '';
+  const msg = err && err.message ? err.message : String(err);
+  banner.style.display = 'block';
+  banner.textContent = '⚠ ' + label + code + ': ' + msg;
+  console.error(label, err);
+}
+window.addEventListener('error', (e) => {
+  showDebugError('Script error', e.error || e.message);
+});
+window.addEventListener('unhandledrejection', (e) => {
+  showDebugError('Unhandled promise rejection', e.reason);
+});
+
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -712,7 +732,7 @@ onAuthStateChanged(auth, async (user) => {
       const exportEmp = document.getElementById('export-employee-select');
       exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
         employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
-    } catch(err) { console.error(err); }
+    } catch(err) { console.error(err); showDebugError('Loading employees failed', err); }
   } else {
     document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
     document.getElementById('admin-portal-btn').classList.remove('hidden');
@@ -723,7 +743,15 @@ onAuthStateChanged(auth, async (user) => {
     ? query(collection(db, 'leads'))
     : query(collection(db, 'leads'), where('assignedTo', '==', user.uid));
 
+  // Watchdog: if still "Connecting…" after 8s with no success/error callback, something is silently stuck
+  const connectWatchdog = setTimeout(() => {
+    if (!liveDot.classList.contains('connected')) {
+      showDebugError('Still connecting after 8s', 'onSnapshot never resolved. Likely causes: Firestore security rules blocking read access, or this domain (' + window.location.hostname + ') not authorized in Firebase Console → Authentication → Settings → Authorized domains.');
+    }
+  }, 8000);
+
   onSnapshot(qLeads, snap => {
+    clearTimeout(connectWatchdog);
     leads = snap.docs.map(d => ({id:d.id,...d.data()}));
     liveDot.classList.add('connected');
     liveDot.innerHTML = '<span>Live</span>';
@@ -734,9 +762,11 @@ onAuthStateChanged(auth, async (user) => {
     renderCallbackBanner();
     if (userRole === 'admin') renderPerfDashboard();
   }, err => {
+    clearTimeout(connectWatchdog);
     console.error(err);
     liveDot.classList.remove('connected');
     liveDot.innerHTML = '<span>Offline</span>';
+    showDebugError('Leads listener failed (userRole: ' + userRole + ', uid: ' + user.uid + ')', err);
   });
 });
 
@@ -1508,38 +1538,4 @@ window.exportCSV = function() {
   if (!filtered.length) { showToast('No leads to export'); return; }
   const cols = ['Business Name','Contact Name','Phone','Email','City','Province','Industry','Website','Status','Callback Date','Note','Assigned To'];
   const rows = [cols.join(',')].concat(filtered.map(l => [
-    q2(f(l,'businessName')), q2(f(l,'contactName')), q2(f(l,'phone')), q2(f(l,'email')),
-    q2(f(l,'city')), q2(f(l,'province')), q2(f(l,'industry')), q2(f(l,'website')),
-    q2(l._status), q2(l._callbackDate||''), q2(l._note||''), q2(l.assignedName||'')
-  ].join(',')));
-  let nameSuffix = '';
-  if (fEmployee === 'unassigned') nameSuffix = '-unassigned';
-  else if (fEmployee) {
-    const emp = employees.find(e => e.uid === fEmployee);
-    nameSuffix = '-' + (emp ? emp.name.toLowerCase().replace(/[^a-z0-9]+/g,'-') : 'agent');
-  }
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([rows.join('\n')], {type:'text/csv'}));
-  a.download = 'navain-leads' + nameSuffix + '-' + new Date().toISOString().slice(0,10) + '.csv';
-  a.click();
-  showToast('✓ Exported ' + filtered.length + ' leads' + (nameSuffix ? ' for ' + nameSuffix.slice(1).replace(/-/g,' ') : ''));
-};
-function q2(v) { return '"' + String(v||'').replace(/"/g,'""') + '"'; }
-
-// ── Portal button
-window.handlePortalBtnClick = function(e) {
-  if (userRole !== 'admin') { e.preventDefault(); openBulkUploadModal(); }
-};
-
-// ── Bulk upload (employee)
-const BULK_TRACKER_FIELDS = [
-  {key:'businessName',label:'Business Name'},{key:'contactName',label:'Contact Name'},
-  {key:'phone',label:'Phone'},{key:'email',label:'Email'},
-  {key:'city',label:'City'},{key:'province',label:'Province'},
-  {key:'industry',label:'Industry'},{key:'website',label:'Website'},
-];
-const BULK_AUTO_MAP = {
-  businessName:['business name','company','company name','prospect_company_name','organization','salon name','business'],
-  contactName:['contact name','name','full name','prospect_full_name','contact','person'],
-  phone:['phone','mobile','contact_mobile_phone','telephone','cell','phone number'],
-  email:['
+    q2(f(l,'businessName')), q2(f(l,'contactNa
