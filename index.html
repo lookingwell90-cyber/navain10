@@ -243,9 +243,6 @@ tr:hover td{background:var(--bg-secondary);}
 </header>
 
 <main>
-  <!-- Debug Error Banner (temporary diagnostic aid) -->
-  <div id="debug-error-banner" style="display:none;background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:12.5px;font-family:monospace;white-space:pre-wrap;word-break:break-word;line-height:1.5;"></div>
-
   <!-- Stats -->
   <div class="stats-grid">
     <div class="stat-card">
@@ -494,24 +491,6 @@ function f(lead, key) {
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function q(v) { return '"' + String(v||'').replace(/"/g,'""') + '"'; }
 
-// ── Temporary diagnostic helper: shows the real error on-screen (mobile has no console access)
-function showDebugError(label, err) {
-  const banner = document.getElementById('debug-error-banner');
-  if (!banner) return;
-  const code = err && err.code ? ' [' + err.code + ']' : '';
-  const msg = err && err.message ? err.message : String(err);
-  banner.style.display = 'block';
-  banner.textContent = '⚠ ' + label + code + ': ' + msg;
-  console.error(label, err);
-}
-window.addEventListener('error', (e) => {
-  showDebugError('Script error', e.error || e.message);
-});
-window.addEventListener('unhandledrejection', (e) => {
-  showDebugError('Unhandled promise rejection', e.reason);
-});
-
-
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('show');
@@ -575,7 +554,7 @@ onAuthStateChanged(auth, async (user) => {
       const exportEmp = document.getElementById('export-employee-select');
       exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
         employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
-    } catch(err) { console.error(err); showDebugError('Loading employees failed', err); }
+    } catch(err) { console.error(err); }
   } else {
     document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
     document.getElementById('admin-portal-btn').classList.remove('hidden');
@@ -586,15 +565,7 @@ onAuthStateChanged(auth, async (user) => {
     ? query(collection(db, 'leads'))
     : query(collection(db, 'leads'), where('assignedTo', '==', user.uid));
 
-  // Watchdog: if still "Connecting…" after 8s with no success/error callback, something is silently stuck
-  const connectWatchdog = setTimeout(() => {
-    if (!liveDot.classList.contains('connected')) {
-      showDebugError('Still connecting after 8s', 'onSnapshot never resolved. Likely causes: Firestore security rules blocking read access, or this domain (' + window.location.hostname + ') not authorized in Firebase Console → Authentication → Settings → Authorized domains.');
-    }
-  }, 8000);
-
   onSnapshot(qLeads, snap => {
-    clearTimeout(connectWatchdog);
     leads = snap.docs.map(d => ({id:d.id,...d.data()}));
     liveDot.classList.add('connected');
     liveDot.innerHTML = '<span>Live</span>';
@@ -605,7 +576,6 @@ onAuthStateChanged(auth, async (user) => {
     if (userRole === 'admin') renderPerfDashboard();
   }, err => {
     console.error(err);
-    showDebugError('Firestore onSnapshot error', err);
     liveDot.classList.remove('connected');
     liveDot.innerHTML = '<span>Offline</span>';
   });
@@ -1486,7 +1456,5 @@ window.renderTable = window.renderTable;
 window.updateStatus = window.updateStatus;
 window.updateNote = window.updateNote;
 </script>
-<script src="https://cdn.jsdelivr.net/npm/eruda"></script>
-<script>eruda.init();</script>
 </body>
 </html>
