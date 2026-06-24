@@ -371,7 +371,7 @@ tr:hover td{background:var(--bg-secondary);}
         <tr>
           <th><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)" title="Select all"></th>
           <th>#</th><th>Business</th><th>Link</th><th>Contact</th><th>Phone</th>
-          <th>City</th><th>Province</th><th>Niche</th><th>Status</th>
+          <th>City</th><th>Province</th><th>Local Time</th><th>Niche</th><th>Status</th>
           <th>Callback Date</th><th>Note</th><th>Assigned</th><th>Updated</th><th></th>
         </tr>
       </thead>
@@ -463,18 +463,19 @@ import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/
 const STATUSES = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
 
 // ── Column Visibility Toggle (saved to localStorage)
-// nth-child index (1-based, includes checkbox col) -> label. Checkbox(1), #(2), Business(3) and Actions(15) always stay visible.
+// nth-child index (1-based, includes checkbox col) -> label. Checkbox(1), #(2), Business(3) and Actions(16) always stay visible.
 const TOGGLEABLE_COLUMNS = [
   {n:4,  label:'Link'},
   {n:5,  label:'Contact'},
   {n:6,  label:'Phone'},
   {n:7,  label:'City'},
   {n:8,  label:'Province'},
-  {n:9,  label:'Niche'},
-  {n:11, label:'Callback Date'},
-  {n:12, label:'Note'},
-  {n:13, label:'Assigned'},
-  {n:14, label:'Updated'},
+  {n:9,  label:'Local Time'},
+  {n:10, label:'Niche'},
+  {n:12, label:'Callback Date'},
+  {n:13, label:'Note'},
+  {n:14, label:'Assigned'},
+  {n:15, label:'Updated'},
 ];
 function getHiddenColumns() {
   try { return JSON.parse(localStorage.getItem('hidden_columns') || '[]'); } catch(e) { return []; }
@@ -590,6 +591,150 @@ function formatDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('en-CA', {month:'short', day:'numeric', year:'numeric'});
 }
+
+// ── Lead local time helpers
+const STATE_TZ = {
+  // Eastern
+  CT:'America/New_York',DE:'America/New_York',FL:'America/New_York',
+  GA:'America/New_York',IN:'America/New_York',MA:'America/New_York',
+  MD:'America/New_York',ME:'America/New_York',MI:'America/New_York',
+  NC:'America/New_York',NH:'America/New_York',NJ:'America/New_York',
+  NY:'America/New_York',OH:'America/New_York',PA:'America/New_York',
+  RI:'America/New_York',SC:'America/New_York',VA:'America/New_York',
+  VT:'America/New_York',WV:'America/New_York',DC:'America/New_York',
+  // Central
+  AL:'America/Chicago',AR:'America/Chicago',IA:'America/Chicago',
+  IL:'America/Chicago',KS:'America/Chicago',LA:'America/Chicago',
+  MN:'America/Chicago',MO:'America/Chicago',MS:'America/Chicago',
+  NE:'America/Chicago',ND:'America/Chicago',OK:'America/Chicago',
+  SD:'America/Chicago',TN:'America/Chicago',TX:'America/Chicago',
+  WI:'America/Chicago',
+  // Mountain
+  CO:'America/Denver',ID:'America/Denver',MT:'America/Denver',
+  NM:'America/Denver',UT:'America/Denver',WY:'America/Denver',
+  AZ:'America/Phoenix',
+  // Pacific
+  CA:'America/Los_Angeles',NV:'America/Los_Angeles',OR:'America/Los_Angeles',
+  WA:'America/Los_Angeles',
+  // Non-contiguous
+  AK:'America/Anchorage',HI:'America/Honolulu',
+  // Canadian provinces (common leads)
+  ON:'America/Toronto',BC:'America/Vancouver',AB:'America/Edmonton',
+  MB:'America/Winnipeg',SK:'America/Regina',QC:'America/Toronto',
+  NS:'America/Halifax',NB:'America/Halifax',NL:'America/St_Johns',
+  PE:'America/Halifax',YT:'America/Whitehorse',NT:'America/Yellowknife',
+  NU:'America/Rankin_Inlet',
+};
+
+// City-level overrides for ambiguous or special cases
+const CITY_TZ = {
+  'phoenix':'America/Phoenix','tucson':'America/Phoenix','mesa':'America/Phoenix',
+  'scottsdale':'America/Phoenix','tempe':'America/Phoenix','chandler':'America/Phoenix',
+  'gilbert':'America/Phoenix','glendale':'America/Phoenix','peoria':'America/Phoenix',
+  'el paso':'America/Denver','amarillo':'America/Chicago',
+  'indiana':null, // avoid false match on "Indiana" as city name
+};
+
+function getLeadTimezone(lead) {
+  const city = (f(lead,'city') || '').toLowerCase().trim();
+  const prov = (f(lead,'province') || '').toUpperCase().trim();
+
+  // City override first
+  if (city && CITY_TZ[city] !== undefined) {
+    return CITY_TZ[city]; // may be null if city is ambiguous
+  }
+
+  // State/province abbreviation
+  if (prov && STATE_TZ[prov]) return STATE_TZ[prov];
+
+  // Try full province name as state abbreviation (some leads store "California" etc.)
+  const STATE_NAMES = {
+    'CALIFORNIA':'America/Los_Angeles','FLORIDA':'America/New_York','TEXAS':'America/Chicago',
+    'NEW YORK':'America/New_York','ILLINOIS':'America/Chicago','PENNSYLVANIA':'America/New_York',
+    'OHIO':'America/New_York','GEORGIA':'America/New_York','NORTH CAROLINA':'America/New_York',
+    'MICHIGAN':'America/New_York','NEW JERSEY':'America/New_York','VIRGINIA':'America/New_York',
+    'WASHINGTON':'America/Los_Angeles','ARIZONA':'America/Phoenix','MASSACHUSETTS':'America/New_York',
+    'TENNESSEE':'America/Chicago','INDIANA':'America/New_York','MISSOURI':'America/Chicago',
+    'MARYLAND':'America/New_York','WISCONSIN':'America/Chicago','COLORADO':'America/Denver',
+    'MINNESOTA':'America/Chicago','SOUTH CAROLINA':'America/New_York','ALABAMA':'America/Chicago',
+    'LOUISIANA':'America/Chicago','KENTUCKY':'America/New_York','OREGON':'America/Los_Angeles',
+    'OKLAHOMA':'America/Chicago','CONNECTICUT':'America/New_York','UTAH':'America/Denver',
+    'IOWA':'America/Chicago','NEVADA':'America/Los_Angeles','ARKANSAS':'America/Chicago',
+    'MISSISSIPPI':'America/Chicago','KANSAS':'America/Chicago','NEW MEXICO':'America/Denver',
+    'NEBRASKA':'America/Chicago','WEST VIRGINIA':'America/New_York','IDAHO':'America/Denver',
+    'HAWAII':'America/Honolulu','MAINE':'America/New_York','NEW HAMPSHIRE':'America/New_York',
+    'RHODE ISLAND':'America/New_York','MONTANA':'America/Denver','DELAWARE':'America/New_York',
+    'SOUTH DAKOTA':'America/Chicago','NORTH DAKOTA':'America/Chicago','ALASKA':'America/Anchorage',
+    'VERMONT':'America/New_York','WYOMING':'America/Denver',
+    'ONTARIO':'America/Toronto','BRITISH COLUMBIA':'America/Vancouver','ALBERTA':'America/Edmonton',
+    'QUEBEC':'America/Toronto','MANITOBA':'America/Winnipeg',
+  };
+  if (prov && STATE_NAMES[prov]) return STATE_NAMES[prov];
+
+  return null; // unknown
+}
+
+function formatLeadLocalTime(lead) {
+  const tz = getLeadTimezone(lead);
+  if (!tz) return null;
+  try {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    // Short TZ label
+    const tzLabel = now.toLocaleTimeString('en-US', {
+      timeZone: tz,
+      timeZoneName: 'short'
+    }).split(' ').pop();
+    return { time: timeStr, tz: tzLabel };
+  } catch(e) {
+    return null;
+  }
+}
+
+function buildTimeCell(lead, isMobile) {
+  const info = formatLeadLocalTime(lead);
+  if (!info) return isMobile ? '' : '<span style="color:var(--text-hint);">—</span>';
+  const hour = parseInt(info.time.split(':')[0]);
+  const isPM = info.time.includes('PM');
+  const hour24 = isPM ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+  // Color code: green=business hours (8-18), yellow=early/late, red=outside hours
+  let dotColor = '#94a3b8';
+  if (hour24 >= 8 && hour24 < 18) dotColor = '#16a34a';
+  else if ((hour24 >= 7 && hour24 < 8) || (hour24 >= 18 && hour24 < 20)) dotColor = '#d97706';
+  else dotColor = '#dc2626';
+  return '<span class="lead-time-cell" data-id="'+lead.id+'" style="display:inline-flex;align-items:center;gap:5px;white-space:nowrap;">' +
+    '<span style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0;display:inline-block;"></span>' +
+    '<span style="font-size:12px;font-weight:600;color:var(--text);">'+info.time+'</span>' +
+    '<span style="font-size:10px;color:var(--text-hint);">'+info.tz+'</span>' +
+  '</span>';
+}
+
+// Refresh all time cells every 30s
+setInterval(() => {
+  document.querySelectorAll('.lead-time-cell').forEach(el => {
+    const id = el.dataset.id;
+    const lead = leads.find(l => l.id === id);
+    if (!lead) return;
+    const info = formatLeadLocalTime(lead);
+    if (!info) return;
+    const hour = parseInt(info.time.split(':')[0]);
+    const isPM = info.time.includes('PM');
+    const hour24 = isPM ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+    let dotColor = '#94a3b8';
+    if (hour24 >= 8 && hour24 < 18) dotColor = '#16a34a';
+    else if ((hour24 >= 7 && hour24 < 8) || (hour24 >= 18 && hour24 < 20)) dotColor = '#d97706';
+    else dotColor = '#dc2626';
+    el.innerHTML =
+      '<span style="width:6px;height:6px;border-radius:50%;background:'+dotColor+';flex-shrink:0;display:inline-block;"></span>' +
+      '<span style="font-size:12px;font-weight:600;color:var(--text);">'+info.time+'</span>' +
+      '<span style="font-size:10px;color:var(--text-hint);">'+info.tz+'</span>';
+  });
+}, 30000);
 
 function callbackStatus(lead) {
   if (lead._status !== 'Callback Scheduled' || !lead._callbackDate) return null;
@@ -813,7 +958,7 @@ window.renderTable = function() {
 
   const tbody = document.getElementById('tbody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
     mobileList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-hint);font-size:13px;">No leads match filters.</div>';
     return;
   }
@@ -853,6 +998,7 @@ window.renderTable = function() {
       '<td style="white-space:nowrap;"><a href="tel:'+esc(phone)+'" style="color:var(--accent);text-decoration:none;font-weight:500;">'+esc(phone||'—')+'</a></td>' +
       '<td style="white-space:nowrap;">'+esc(f(lead,'city')||'—')+'</td>' +
       '<td style="white-space:nowrap;">'+esc(f(lead,'province')||'—')+'</td>' +
+      '<td style="white-space:nowrap;">'+buildTimeCell(lead, false)+'</td>' +
       '<td style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+esc(f(lead,'industry')||'—')+'</td>' +
       '<td><select class="status-select" data-id="'+lead.id+'" onchange="updateStatus(this)" style="background:'+col.bg+';color:'+col.text+';border-color:transparent;">'+
         STATUSES.map(s=>'<option'+(lead._status===s?' selected':'')+'>'+s+'</option>').join('') +
@@ -887,7 +1033,9 @@ window.renderTable = function() {
       '</div>' +
       '<div class="mobile-card-row" style="margin-top:8px;">' +
         '<div><a href="tel:'+esc(phone)+'" style="color:var(--accent);font-weight:600;font-size:13px;text-decoration:none;">'+esc(phone||'—')+'</a>' +
-        '<div class="mobile-meta">'+esc(f(lead,'city')||'—')+', '+esc(f(lead,'province')||'—')+'</div></div>' +
+        '<div class="mobile-meta">'+esc(f(lead,'city')||'—')+', '+esc(f(lead,'province')||'—')+'</div>' +
+        (buildTimeCell(lead, true) ? '<div style="margin-top:4px;">'+buildTimeCell(lead, true)+'</div>' : '') +
+        '</div>' +
         '<select class="status-select" data-id="'+lead.id+'" onchange="updateStatus(this)" style="background:'+col.bg+';color:'+col.text+';border-color:transparent;">'+
           STATUSES.map(s=>'<option'+(lead._status===s?' selected':'')+'>'+s+'</option>').join('')+'</select>' +
       '</div>' +
@@ -1561,5 +1709,50 @@ window.renderTable = window.renderTable;
 window.updateStatus = window.updateStatus;
 window.updateNote = window.updateNote;
 </script>
+
+<!-- ── Footer ── -->
+<footer style="background:var(--bg);border-top:1px solid var(--border);padding:24px;margin-top:auto;">
+  <div style="max-width:900px;margin:0 auto;display:flex;flex-wrap:wrap;gap:20px;justify-content:center;">
+
+    <div style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;min-width:240px;flex:1;max-width:360px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:var(--text);line-height:1.3;">Naveed Mughal</div>
+        <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">CEO</div>
+        <a href="mailto:naveed.messi67@gmail.com" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);text-decoration:none;margin-bottom:3px;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          naveed.messi67@gmail.com
+        </a>
+        <a href="tel:+923324106889" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6.29 6.29l.94-.93a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          0332 4106889
+        </a>
+      </div>
+    </div>
+
+    <div style="display:flex;align-items:flex-start;gap:12px;background:var(--bg-secondary);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;min-width:240px;flex:1;max-width:360px;">
+      <div style="width:38px;height:38px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      </div>
+      <div>
+        <div style="font-weight:700;font-size:14px;color:var(--text);line-height:1.3;">Hunain Dilawar</div>
+        <div style="font-size:11px;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px;">CFO</div>
+        <a href="mailto:Hunaindilawar40@gmail.com" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);text-decoration:none;margin-bottom:3px;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          Hunaindilawar40@gmail.com
+        </a>
+        <a href="tel:+923391091002" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--text-muted);text-decoration:none;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.62 3.38 2 2 0 0 1 3.6 1.21h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.81a16 16 0 0 0 6.29 6.29l.94-.93a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          0339 1091002
+        </a>
+      </div>
+    </div>
+
+  </div>
+  <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-hint);">© 2025 Navain AI · All rights reserved</div>
+</footer>
+
 </body>
 </html>
