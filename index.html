@@ -626,22 +626,223 @@ const STATE_TZ = {
   NU:'America/Rankin_Inlet',
 };
 
-// City-level overrides for ambiguous or special cases
+// City-level timezone map — covers major US cities so time shows even without province
 const CITY_TZ = {
+  // Minnesota (Central)
+  'minneapolis':'America/Chicago','saint paul':'America/Chicago','st paul':'America/Chicago',
+  'st. paul':'America/Chicago','rochester':'America/Chicago','duluth':'America/Chicago',
+  'bloomington':'America/Chicago','brooklyn park':'America/Chicago','plymouth':'America/Chicago',
+  'maple grove':'America/Chicago','woodbury':'America/Chicago','lakeville':'America/Chicago',
+  'burnsville':'America/Chicago','blaine':'America/Chicago','minnetonka':'America/Chicago',
+  'eden prairie':'America/Chicago','coon rapids':'America/Chicago','eagan':'America/Chicago',
+  'apple valley':'America/Chicago','edina':'America/Chicago','st cloud':'America/Chicago',
+  'saint cloud':'America/Chicago','mankato':'America/Chicago','moorhead':'America/Chicago',
+  // Arizona (Mountain no-DST)
   'phoenix':'America/Phoenix','tucson':'America/Phoenix','mesa':'America/Phoenix',
   'scottsdale':'America/Phoenix','tempe':'America/Phoenix','chandler':'America/Phoenix',
   'gilbert':'America/Phoenix','glendale':'America/Phoenix','peoria':'America/Phoenix',
-  'el paso':'America/Denver','amarillo':'America/Chicago',
-  'indiana':null, // avoid false match on "Indiana" as city name
+  'surprise':'America/Phoenix','goodyear':'America/Phoenix','avondale':'America/Phoenix',
+  'flagstaff':'America/Phoenix','yuma':'America/Phoenix','casa grande':'America/Phoenix',
+  // California (Pacific)
+  'los angeles':'America/Los_Angeles','san diego':'America/Los_Angeles','san jose':'America/Los_Angeles',
+  'san francisco':'America/Los_Angeles','fresno':'America/Los_Angeles','sacramento':'America/Los_Angeles',
+  'long beach':'America/Los_Angeles','oakland':'America/Los_Angeles','bakersfield':'America/Los_Angeles',
+  'anaheim':'America/Los_Angeles','santa ana':'America/Los_Angeles','riverside':'America/Los_Angeles',
+  'stockton':'America/Los_Angeles','irvine':'America/Los_Angeles','chula vista':'America/Los_Angeles',
+  'fremont':'America/Los_Angeles','san bernardino':'America/Los_Angeles','modesto':'America/Los_Angeles',
+  'fontana':'America/Los_Angeles','moreno valley':'America/Los_Angeles','glendale':'America/Los_Angeles',
+  'huntington beach':'America/Los_Angeles','santa clarita':'America/Los_Angeles','garden grove':'America/Los_Angeles',
+  'oceanside':'America/Los_Angeles','rancho cucamonga':'America/Los_Angeles','santa rosa':'America/Los_Angeles',
+  'elk grove':'America/Los_Angeles','ontario':'America/Los_Angeles','corona':'America/Los_Angeles',
+  'lancaster':'America/Los_Angeles','palmdale':'America/Los_Angeles','salinas':'America/Los_Angeles',
+  'pasadena':'America/Los_Angeles','torrance':'America/Los_Angeles','hayward':'America/Los_Angeles',
+  'sunnyvale':'America/Los_Angeles','pomona':'America/Los_Angeles','escondido':'America/Los_Angeles',
+  'burbank':'America/Los_Angeles','compton':'America/Los_Angeles','thousand oaks':'America/Los_Angeles',
+  'visalia':'America/Los_Angeles','simi valley':'America/Los_Angeles','concord':'America/Los_Angeles',
+  'santa clara':'America/Los_Angeles','roseville':'America/Los_Angeles','vallejo':'America/Los_Angeles',
+  'beverly hills':'America/Los_Angeles','malibu':'America/Los_Angeles','venice':'America/Los_Angeles',
+  // Texas (Central, except El Paso)
+  'houston':'America/Chicago','san antonio':'America/Chicago','dallas':'America/Chicago',
+  'austin':'America/Chicago','fort worth':'America/Chicago','el paso':'America/Denver',
+  'arlington':'America/Chicago','corpus christi':'America/Chicago','plano':'America/Chicago',
+  'laredo':'America/Chicago','lubbock':'America/Chicago','garland':'America/Chicago',
+  'irving':'America/Chicago','amarillo':'America/Chicago','grand prairie':'America/Chicago',
+  'brownsville':'America/Chicago','mckinney':'America/Chicago','frisco':'America/Chicago',
+  'pasadena':'America/Chicago','mesquite':'America/Chicago','mcallen':'America/Chicago',
+  'killeen':'America/Chicago','waco':'America/Chicago','denton':'America/Chicago',
+  'carrollton':'America/Chicago','midland':'America/Chicago','abilene':'America/Chicago',
+  'beaumont':'America/Chicago','round rock':'America/Chicago','odessa':'America/Chicago',
+  'richardson':'America/Chicago','lewisville':'America/Chicago','tyler':'America/Chicago',
+  'pearland':'America/Chicago','sugar land':'America/Chicago','allen':'America/Chicago',
+  'league city':'America/Chicago','wichita falls':'America/Chicago','edinburg':'America/Chicago',
+  // Florida (Eastern)
+  'jacksonville':'America/New_York','miami':'America/New_York','tampa':'America/New_York',
+  'orlando':'America/New_York','st. petersburg':'America/New_York','st petersburg':'America/New_York',
+  'hialeah':'America/New_York','tallahassee':'America/New_York','fort lauderdale':'America/New_York',
+  'port st. lucie':'America/New_York','cape coral':'America/New_York','pembroke pines':'America/New_York',
+  'hollywood':'America/New_York','miramar':'America/New_York','gainesville':'America/New_York',
+  'coral springs':'America/New_York','miami gardens':'America/New_York','clearwater':'America/New_York',
+  'palm bay':'America/New_York','pompano beach':'America/New_York','west palm beach':'America/New_York',
+  'lakeland':'America/New_York','boca raton':'America/New_York','naples':'America/New_York',
+  'sarasota':'America/New_York','fort myers':'America/New_York','pensacola':'America/Chicago',
+  // New York (Eastern)
+  'new york':'America/New_York','new york city':'America/New_York','nyc':'America/New_York',
+  'buffalo':'America/New_York','yonkers':'America/New_York','rochester':'America/New_York',
+  'albany':'America/New_York','brooklyn':'America/New_York','queens':'America/New_York',
+  'bronx':'America/New_York','manhattan':'America/New_York','staten island':'America/New_York',
+  'long island':'America/New_York','syracuse':'America/New_York','new rochelle':'America/New_York',
+  // Illinois (Central)
+  'chicago':'America/Chicago','aurora':'America/Chicago','joliet':'America/Chicago',
+  'naperville':'America/Chicago','rockford':'America/Chicago','springfield':'America/Chicago',
+  'elgin':'America/Chicago','peoria':'America/Chicago','champaign':'America/Chicago',
+  'waukegan':'America/Chicago','cicero':'America/Chicago','bloomington':'America/Chicago',
+  'arlington heights':'America/Chicago','evanston':'America/Chicago','schaumburg':'America/Chicago',
+  // Pennsylvania (Eastern)
+  'philadelphia':'America/New_York','pittsburgh':'America/New_York','allentown':'America/New_York',
+  'erie':'America/New_York','reading':'America/New_York','scranton':'America/New_York',
+  'bethlehem':'America/New_York','lancaster':'America/New_York','harrisburg':'America/New_York',
+  // Ohio (Eastern)
+  'columbus':'America/New_York','cleveland':'America/New_York','cincinnati':'America/New_York',
+  'toledo':'America/New_York','akron':'America/New_York','dayton':'America/New_York',
+  'parma':'America/New_York','canton':'America/New_York','youngstown':'America/New_York',
+  // Georgia (Eastern)
+  'atlanta':'America/New_York','columbus':'America/New_York','savannah':'America/New_York',
+  'macon':'America/New_York','athens':'America/New_York','albany':'America/New_York',
+  // North Carolina (Eastern)
+  'charlotte':'America/New_York','raleigh':'America/New_York','greensboro':'America/New_York',
+  'durham':'America/New_York','winston-salem':'America/New_York','fayetteville':'America/New_York',
+  'cary':'America/New_York','wilmington':'America/New_York','high point':'America/New_York',
+  // Michigan (Eastern)
+  'detroit':'America/New_York','grand rapids':'America/New_York','warren':'America/New_York',
+  'sterling heights':'America/New_York','ann arbor':'America/New_York','lansing':'America/New_York',
+  'flint':'America/New_York','dearborn':'America/New_York','livonia':'America/New_York',
+  // Washington state (Pacific)
+  'seattle':'America/Los_Angeles','spokane':'America/Los_Angeles','tacoma':'America/Los_Angeles',
+  'bellevue':'America/Los_Angeles','kent':'America/Los_Angeles','everett':'America/Los_Angeles',
+  'renton':'America/Los_Angeles','yakima':'America/Los_Angeles','kirkland':'America/Los_Angeles',
+  // Colorado (Mountain)
+  'denver':'America/Denver','colorado springs':'America/Denver','aurora':'America/Denver',
+  'fort collins':'America/Denver','lakewood':'America/Denver','thornton':'America/Denver',
+  'arvada':'America/Denver','westminster':'America/Denver','pueblo':'America/Denver','boulder':'America/Denver',
+  // Nevada (Pacific)
+  'las vegas':'America/Los_Angeles','henderson':'America/Los_Angeles','reno':'America/Los_Angeles',
+  'north las vegas':'America/Los_Angeles','sparks':'America/Los_Angeles',
+  // Oregon (Pacific)
+  'portland':'America/Los_Angeles','eugene':'America/Los_Angeles','salem':'America/Los_Angeles',
+  'gresham':'America/Los_Angeles','hillsboro':'America/Los_Angeles','beaverton':'America/Los_Angeles',
+  // Tennessee (Central)
+  'nashville':'America/Chicago','memphis':'America/Chicago','knoxville':'America/New_York',
+  'chattanooga':'America/New_York','clarksville':'America/Chicago','murfreesboro':'America/Chicago',
+  // Missouri (Central)
+  'kansas city':'America/Chicago','st. louis':'America/Chicago','st louis':'America/Chicago',
+  'springfield':'America/Chicago','independence':'America/Chicago','columbia':'America/Chicago',
+  // Wisconsin (Central)
+  'milwaukee':'America/Chicago','madison':'America/Chicago','green bay':'America/Chicago',
+  'kenosha':'America/Chicago','racine':'America/Chicago','appleton':'America/Chicago',
+  // Indiana (Eastern)
+  'indianapolis':'America/New_York','fort wayne':'America/New_York','evansville':'America/New_York',
+  'south bend':'America/New_York','hammond':'America/Chicago','gary':'America/Chicago',
+  // Maryland (Eastern)
+  'baltimore':'America/New_York','frederick':'America/New_York','gaithersburg':'America/New_York',
+  'rockville':'America/New_York','bowie':'America/New_York',
+  // Virginia (Eastern)
+  'virginia beach':'America/New_York','chesapeake':'America/New_York','norfolk':'America/New_York',
+  'richmond':'America/New_York','newport news':'America/New_York','hampton':'America/New_York',
+  'alexandria':'America/New_York','roanoke':'America/New_York',
+  // Massachusetts (Eastern)
+  'boston':'America/New_York','worcester':'America/New_York','springfield':'America/New_York',
+  'lowell':'America/New_York','cambridge':'America/New_York','new bedford':'America/New_York',
+  // New Jersey (Eastern)
+  'newark':'America/New_York','jersey city':'America/New_York','paterson':'America/New_York',
+  'elizabeth':'America/New_York','trenton':'America/New_York','camden':'America/New_York',
+  // DC
+  'washington':'America/New_York','washington dc':'America/New_York','washington d.c.':'America/New_York',
+  // Louisiana (Central)
+  'new orleans':'America/Chicago','baton rouge':'America/Chicago','shreveport':'America/Chicago',
+  'lafayette':'America/Chicago','lake charles':'America/Chicago',
+  // Oklahoma (Central)
+  'oklahoma city':'America/Chicago','tulsa':'America/Chicago','norman':'America/Chicago',
+  'broken arrow':'America/Chicago','lawton':'America/Chicago',
+  // Kansas (Central)
+  'wichita':'America/Chicago','overland park':'America/Chicago','kansas city':'America/Chicago',
+  'olathe':'America/Chicago','topeka':'America/Chicago',
+  // Nebraska (Central)
+  'omaha':'America/Chicago','lincoln':'America/Chicago',
+  // Iowa (Central)
+  'des moines':'America/Chicago','cedar rapids':'America/Chicago','davenport':'America/Chicago',
+  'sioux city':'America/Chicago','iowa city':'America/Chicago',
+  // Utah (Mountain)
+  'salt lake city':'America/Denver','provo':'America/Denver','west valley city':'America/Denver',
+  'west jordan':'America/Denver','orem':'America/Denver','ogden':'America/Denver',
+  // New Mexico (Mountain)
+  'albuquerque':'America/Denver','las cruces':'America/Denver','rio rancho':'America/Denver',
+  // Idaho (Mountain)
+  'boise':'America/Denver','nampa':'America/Denver','meridian':'America/Denver',
+  // Montana (Mountain)
+  'billings':'America/Denver','missoula':'America/Denver','great falls':'America/Denver',
+  // Hawaii & Alaska
+  'honolulu':'America/Honolulu','hilo':'America/Honolulu','anchorage':'America/Anchorage',
+  'fairbanks':'America/Anchorage','juneau':'America/Anchorage',
+  // Canada — Ontario (Eastern)
+  'toronto':'America/Toronto','ottawa':'America/Toronto','mississauga':'America/Toronto',
+  'brampton':'America/Toronto','hamilton':'America/Toronto','london':'America/Toronto',
+  'markham':'America/Toronto','vaughan':'America/Toronto','kitchener':'America/Toronto',
+  'windsor':'America/Toronto','richmond hill':'America/Toronto','oakville':'America/Toronto',
+  'burlington':'America/Toronto','oshawa':'America/Toronto','barrie':'America/Toronto',
+  'sudbury':'America/Toronto','kingston':'America/Toronto','guelph':'America/Toronto',
+  'thunder bay':'America/Toronto','waterloo':'America/Toronto','cambridge':'America/Toronto',
+  'ajax':'America/Toronto','whitby':'America/Toronto','pickering':'America/Toronto',
+  'niagara falls':'America/Toronto','st. catharines':'America/Toronto','st catharines':'America/Toronto',
+  'north bay':'America/Toronto','sault ste. marie':'America/Toronto','sault ste marie':'America/Toronto',
+  // Canada — Quebec (Eastern)
+  'montreal':'America/Toronto','quebec city':'America/Toronto','laval':'America/Toronto',
+  'gatineau':'America/Toronto','longueuil':'America/Toronto','sherbrooke':'America/Toronto',
+  'saguenay':'America/Toronto','levis':'America/Toronto','trois-rivieres':'America/Toronto',
+  'terrebonne':'America/Toronto','brossard':'America/Toronto','repentigny':'America/Toronto',
+  // Canada — British Columbia (Pacific)
+  'vancouver':'America/Vancouver','surrey':'America/Vancouver','burnaby':'America/Vancouver',
+  'richmond':'America/Vancouver','kelowna':'America/Vancouver','abbotsford':'America/Vancouver',
+  'coquitlam':'America/Vancouver','langley':'America/Vancouver','saanich':'America/Vancouver',
+  'delta':'America/Vancouver','north vancouver':'America/Vancouver','west vancouver':'America/Vancouver',
+  'kamloops':'America/Vancouver','nanaimo':'America/Vancouver','victoria':'America/Vancouver',
+  'chilliwack':'America/Vancouver','maple ridge':'America/Vancouver','prince george':'America/Vancouver',
+  // Canada — Alberta (Mountain)
+  'calgary':'America/Edmonton','edmonton':'America/Edmonton','red deer':'America/Edmonton',
+  'lethbridge':'America/Edmonton','st. albert':'America/Edmonton','st albert':'America/Edmonton',
+  'medicine hat':'America/Edmonton','grande prairie':'America/Edmonton','airdrie':'America/Edmonton',
+  'spruce grove':'America/Edmonton','leduc':'America/Edmonton','fort mcmurray':'America/Edmonton',
+  // Canada — Manitoba (Central)
+  'winnipeg':'America/Winnipeg','brandon':'America/Winnipeg','steinbach':'America/Winnipeg',
+  'thompson':'America/Winnipeg','portage la prairie':'America/Winnipeg',
+  // Canada — Saskatchewan (Central, no DST)
+  'saskatoon':'America/Regina','regina':'America/Regina','prince albert':'America/Regina',
+  'moose jaw':'America/Regina','swift current':'America/Regina','yorkton':'America/Regina',
+  // Canada — Nova Scotia (Atlantic)
+  'halifax':'America/Halifax','dartmouth':'America/Halifax','sydney':'America/Halifax',
+  'truro':'America/Halifax','new glasgow':'America/Halifax',
+  // Canada — New Brunswick (Atlantic)
+  'moncton':'America/Halifax','saint john':'America/Halifax','fredericton':'America/Halifax',
+  // Canada — Newfoundland (special -3:30)
+  'st. john\'s':'America/St_Johns','st johns':'America/St_Johns','corner brook':'America/St_Johns',
+  // Canada — PEI (Atlantic)
+  'charlottetown':'America/Halifax','summerside':'America/Halifax',
+  // Canada — Yukon (Pacific no DST)
+  'whitehorse':'America/Whitehorse',
+  // Canada — Northwest Territories (Mountain)
+  'yellowknife':'America/Yellowknife',
+  // Canada — Nunavut (Eastern)
+  'iqaluit':'America/Iqaluit',
+  // Ambiguous — skip
+  'indiana':null,'springfield':null,'columbus':null,'richmond':null,'albany':null,
 };
 
 function getLeadTimezone(lead) {
   const city = (f(lead,'city') || '').toLowerCase().trim();
   const prov = (f(lead,'province') || '').toUpperCase().trim();
 
-  // City override first
-  if (city && CITY_TZ[city] !== undefined) {
-    return CITY_TZ[city]; // may be null if city is ambiguous
+  // City lookup — skip ambiguous cities (null) and fall through to state
+  if (city && CITY_TZ[city] !== undefined && CITY_TZ[city] !== null) {
+    return CITY_TZ[city];
   }
 
   // State/province abbreviation
