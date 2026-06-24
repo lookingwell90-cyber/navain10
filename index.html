@@ -130,7 +130,19 @@ tr:last-child td{border-bottom:none;}
 tr:hover td{background:var(--bg-secondary);}
 /* Callback overdue badge */
 .overdue-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:var(--danger-bg);color:var(--danger-text);margin-left:6px;}
+.due-now-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#fed7aa;color:#9a3412;margin-left:6px;animation:pulse-due 2s ease-in-out infinite;}
+@keyframes pulse-due{0%,100%{opacity:1;}50%{opacity:0.6;}}
 .due-today-badge{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:#fef3c7;color:#92400e;margin-left:6px;}
+.tag-chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:600;margin-right:4px;margin-bottom:3px;white-space:nowrap;}
+.tag-chip-remove{margin-left:5px;cursor:pointer;font-weight:700;opacity:0.65;}
+.tag-chip-remove:hover{opacity:1;}
+.tag-add-btn{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;border:1px dashed var(--border-strong);color:var(--text-muted);font-size:13px;font-weight:700;cursor:pointer;background:transparent;line-height:1;}
+.tag-add-btn:hover{background:var(--bg-secondary);}
+.tag-picker-popup{position:absolute;z-index:1100;background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius);box-shadow:0 8px 24px rgba(0,0,0,0.15);padding:10px;min-width:200px;max-width:240px;}
+.tag-picker-option{display:flex;align-items:center;gap:7px;padding:6px 8px;border-radius:6px;cursor:pointer;font-size:12.5px;}
+.tag-picker-option:hover{background:var(--bg-secondary);}
+.tag-picker-swatch{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+.tag-picker-input{width:100%;padding:6px 8px;font-size:12.5px;border:1px solid var(--border-strong);border-radius:6px;background:var(--bg);color:var(--text);outline:none;margin-bottom:6px;}
 .admin-assigned-badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:8px;font-size:10px;font-weight:700;background:linear-gradient(135deg,#7c3aed22,#db277722);color:#7c3aed;border:1px solid #7c3aed33;margin-left:6px;}
 .admin-assigned-row{background:linear-gradient(90deg,#7c3aed08 0%,transparent 100%) !important;}
 .admin-assigned-card{border-left:3px solid #7c3aed !important;}
@@ -186,6 +198,7 @@ tr:hover td{background:var(--bg-secondary);}
 .call-log-note{font-size:13px;color:var(--text);margin-top:3px;}
 /* Callback date */
 .callback-date-input{padding:7px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;width:100%;margin-top:6px;}
+.callback-time-input{padding:7px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;width:100%;margin-top:6px;}
 .callback-date-input:focus{border-color:var(--accent);}
 /* Section toggle */
 .section-toggle{display:flex;align-items:center;gap:8px;cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:14px;}
@@ -335,9 +348,11 @@ tr:hover td{background:var(--bg-secondary);}
     <select id="filter-city" onchange="renderTable()"><option value="">All Cities</option></select>
     <select id="filter-province" onchange="renderTable()"><option value="">All Provinces</option></select>
     <select id="filter-niche" onchange="renderTable()"><option value="">All Niches</option></select>
+    <select id="filter-tag" onchange="renderTable()"><option value="">All Tags</option></select>
     <select id="filter-callback" onchange="renderTable()">
       <option value="">All Callbacks</option>
       <option value="overdue">Overdue</option>
+      <option value="duenow">Due Soon (next 2h)</option>
       <option value="today">Due Today</option>
     </select>
     <select id="sort-by" onchange="renderTable()">
@@ -537,6 +552,30 @@ const STATUS_COLORS = {
   'Callback Scheduled': {bg:'var(--s-callback-bg)',     text:'var(--s-callback-text)'},
   'Wrong Number':       {bg:'var(--s-wrong-bg)',        text:'var(--s-wrong-text)'},
 };
+
+// ── Tags (free-form labels, separate from pipeline status)
+const TAG_PALETTE = [
+  {name:'Hot',              bg:'#fee2e2', text:'#991b1b'},
+  {name:'Needs Demo',       bg:'#dbeafe', text:'#1e40af'},
+  {name:'Price Objection',  bg:'#fef3c7', text:'#92400e'},
+  {name:'Decision Maker',   bg:'#dcfce7', text:'#166534'},
+  {name:'Gatekeeper',       bg:'#f3e8ff', text:'#6b21a8'},
+  {name:'Bad Timing',       bg:'#e0e7ff', text:'#3730a3'},
+  {name:'Competitor',       bg:'#fce7f3', text:'#9d174d'},
+  {name:'VIP',              bg:'#fef9c3', text:'#854d0e'},
+];
+const TAG_COLOR_FALLBACK = {bg:'#e2e8f0', text:'#334155'};
+function tagColor(name) {
+  const found = TAG_PALETTE.find(t => t.name.toLowerCase() === String(name||'').toLowerCase());
+  return found || TAG_COLOR_FALLBACK;
+}
+function renderTagChips(tags, extraStyle) {
+  if (!Array.isArray(tags) || tags.length === 0) return '';
+  return tags.map(t => {
+    const c = tagColor(t);
+    return '<span class="tag-chip" style="background:'+c.bg+';color:'+c.text+';'+(extraStyle||'')+'">'+esc(t)+'</span>';
+  }).join('');
+}
 
 let leads = [];
 const noteTimers = {};
@@ -1347,13 +1386,35 @@ setInterval(() => {
 
 function callbackStatus(lead) {
   if (lead._status !== 'Callback Scheduled' || !lead._callbackDate) return null;
-  const cb = new Date(lead._callbackDate);
   const now = new Date();
+  if (lead._callbackTime) {
+    // Date + time set — compare full timestamp
+    const cb = new Date(lead._callbackDate + 'T' + lead._callbackTime);
+    if (isNaN(cb.getTime())) return null;
+    if (cb.getTime() < now.getTime()) return 'overdue';
+    const diffMs = cb.getTime() - now.getTime();
+    if (diffMs <= 2 * 60 * 60 * 1000) return 'duenow'; // within next 2 hours
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const cbDay = new Date(cb.getFullYear(), cb.getMonth(), cb.getDate());
+    if (cbDay.getTime() === today.getTime()) return 'today';
+    return 'future';
+  }
+  // Date only, no time — fall back to day-level comparison
+  const cb = new Date(lead._callbackDate);
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const cbDay = new Date(cb.getFullYear(), cb.getMonth(), cb.getDate());
   if (cbDay < today) return 'overdue';
   if (cbDay.getTime() === today.getTime()) return 'today';
   return 'future';
+}
+
+function formatCallbackTime(timeStr) {
+  if (!timeStr) return '';
+  const [h, m] = timeStr.split(':').map(Number);
+  if (isNaN(h)) return '';
+  const period = h >= 12 ? 'PM' : 'AM';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + ':' + String(m).padStart(2,'0') + ' ' + period;
 }
 
 // ── Auth
@@ -1425,13 +1486,17 @@ function updateStats() {
   const interested = leads.filter(l => l._status === 'Interested').length;
   const callbacks = leads.filter(l => l._status === 'Callback Scheduled').length;
   const overdue = leads.filter(l => callbackStatus(l) === 'overdue').length;
+  const dueSoon = leads.filter(l => callbackStatus(l) === 'duenow').length;
   document.getElementById('stat-total').textContent = total;
   document.getElementById('stat-called-rate').textContent = rate + '%';
   document.getElementById('stat-called-count').textContent = called + ' of ' + total + ' called';
   document.getElementById('stat-interested').textContent = interested;
   document.getElementById('stat-callback').textContent = callbacks;
-  if (overdue > 0) {
-    document.getElementById('stat-overdue-label').innerHTML = 'Requires follow-up · <strong style="color:var(--danger-text);">'+overdue+' overdue</strong>';
+  if (overdue > 0 || dueSoon > 0) {
+    const parts = [];
+    if (overdue > 0) parts.push('<strong style="color:var(--danger-text);">'+overdue+' overdue</strong>');
+    if (dueSoon > 0) parts.push('<strong style="color:#9a3412;">'+dueSoon+' due soon</strong>');
+    document.getElementById('stat-overdue-label').innerHTML = 'Requires follow-up · '+parts.join(' · ');
   } else {
     document.getElementById('stat-overdue-label').textContent = 'Requires follow-up';
   }
@@ -1481,14 +1546,17 @@ function populateFilters() {
   const cities = [...new Set(leads.map(l => f(l,'city')).filter(Boolean))].sort();
   const provinces = [...new Set(leads.map(l => f(l,'province')).filter(Boolean))].sort();
   const niches = [...new Set(leads.map(l => f(l,'industry')).filter(Boolean))].sort();
+  const tagsInUse = [...new Set(leads.flatMap(l => Array.isArray(l._tags) ? l._tags : []))].sort();
   const cityEl = document.getElementById('filter-city');
   const provEl = document.getElementById('filter-province');
   const nicheEl = document.getElementById('filter-niche');
-  const sc = cityEl.value, sp = provEl.value, sn = nicheEl.value;
+  const tagEl = document.getElementById('filter-tag');
+  const sc = cityEl.value, sp = provEl.value, sn = nicheEl.value, st = tagEl ? tagEl.value : '';
   cityEl.innerHTML = '<option value="">All Cities</option>' + cities.map(c => '<option>'+esc(c)+'</option>').join('');
   provEl.innerHTML = '<option value="">All Provinces</option>' + provinces.map(p => '<option>'+esc(p)+'</option>').join('');
   nicheEl.innerHTML = '<option value="">All Niches</option>' + niches.map(n => '<option>'+esc(n)+'</option>').join('');
-  cityEl.value = sc; provEl.value = sp; nicheEl.value = sn;
+  if (tagEl) tagEl.innerHTML = '<option value="">All Tags</option>' + tagsInUse.map(t => '<option>'+esc(t)+'</option>').join('');
+  cityEl.value = sc; provEl.value = sp; nicheEl.value = sn; if (tagEl) tagEl.value = st;
   const bulkStatusEl = document.getElementById('bulk-status-select');
   if (bulkStatusEl && bulkStatusEl.options.length <= 1) {
     bulkStatusEl.innerHTML = '<option value="">Set status…</option>' + STATUSES.map(s => '<option value="'+esc(s)+'">'+esc(s)+'</option>').join('');
@@ -1518,6 +1586,7 @@ window.renderTable = function() {
   const fCity = document.getElementById('filter-city').value;
   const fProv = document.getElementById('filter-province').value;
   const fNiche = document.getElementById('filter-niche').value;
+  const fTag = document.getElementById('filter-tag') ? document.getElementById('filter-tag').value : '';
   const fCallback = document.getElementById('filter-callback').value;
   const sortBy = document.getElementById('sort-by').value;
 
@@ -1531,14 +1600,17 @@ window.renderTable = function() {
     if (fCity && f(l,'city') !== fCity) return false;
     if (fProv && f(l,'province') !== fProv) return false;
     if (fNiche && f(l,'industry') !== fNiche) return false;
+    if (fTag && !(Array.isArray(l._tags) && l._tags.includes(fTag))) return false;
     if (fCallback) {
       const cs = callbackStatus(l);
       if (fCallback === 'overdue' && cs !== 'overdue') return false;
-      if (fCallback === 'today' && cs !== 'today') return false;
+      if (fCallback === 'duenow' && cs !== 'duenow') return false;
+      if (fCallback === 'today' && cs !== 'today' && cs !== 'duenow') return false;
     }
     if (q) {
       const historyText = Array.isArray(l._notesHistory) ? l._notesHistory.map(e => e.text||'').join(' ') : '';
-      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText].join(' ').toLowerCase();
+      const tagsText = Array.isArray(l._tags) ? l._tags.join(' ') : '';
+      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText,tagsText].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -1580,9 +1652,12 @@ window.renderTable = function() {
     const bName = f(lead,'businessName') || '—';
     const webUrl = f(lead,'website');
     const cs = callbackStatus(lead);
-    const cbBadge = cs === 'overdue' ? '<span class="overdue-badge">⚠ Overdue</span>' : cs === 'today' ? '<span class="due-today-badge">📅 Today</span>' : '';
+    const cbBadge = cs === 'overdue' ? '<span class="overdue-badge">⚠ Overdue</span>' : cs === 'duenow' ? '<span class="due-now-badge">🔔 Due Soon</span>' : cs === 'today' ? '<span class="due-today-badge">📅 Today</span>' : '';
     const cbCell = lead._status === 'Callback Scheduled'
-      ? '<input type="date" class="callback-date-input" style="margin-top:0;padding:5px 7px;font-size:12px;width:128px;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)">' + (cbBadge?'<div style="margin-top:3px;">'+cbBadge+'</div>':'')
+      ? '<div style="display:flex;gap:4px;">' +
+        '<input type="date" class="callback-date-input" style="margin-top:0;padding:5px 7px;font-size:12px;width:108px;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)">' +
+        '<input type="time" class="callback-time-input" style="margin-top:0;padding:5px 6px;font-size:12px;width:88px;" data-id="'+lead.id+'" value="'+(lead._callbackTime||'')+'" onchange="updateCallbackTimeInline(this)">' +
+        '</div>' + (cbBadge?'<div style="margin-top:3px;">'+cbBadge+'</div>':'')
       : '<span style="color:var(--text-hint);">—</span>';
     const isSelected = selectedLeadIds.has(lead.id);
     const isAdminAssigned = !!lead._adminAssigned;
@@ -1601,7 +1676,9 @@ window.renderTable = function() {
     return '<tr class="'+(isAdminAssigned?'admin-assigned-row':'')+'" style="'+(isSelected?'background:var(--accent-bg);':'')+'">' +
       '<td><input type="checkbox" class="lead-cb" data-id="'+lead.id+'" onchange="toggleLeadSelect(this)" '+(isSelected?'checked':'')+' '+(userRole!=='admin'?'style="display:none"':'')+'/></td>' +
       '<td style="color:var(--text-hint);font-size:12px;">'+(idx+1)+'</td>' +
-      '<td style="font-weight:600;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="'+esc(bName)+'"><button class="btn-icon" onclick="openDetailModal(\''+lead.id+'\')" title="View details">'+esc(bName)+'</button>'+adminBadge+'</td>' +
+      '<td style="font-weight:600;max-width:170px;white-space:normal;" title="'+esc(bName)+'"><button class="btn-icon" onclick="openDetailModal(\''+lead.id+'\')" title="View details" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:170px;">'+esc(bName)+'</button>'+adminBadge+
+        '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:2px;">'+renderTagChips(lead._tags, '')+'<button class="tag-add-btn" data-id="'+lead.id+'" onclick="openTagPicker(event,this)" title="Add tag">+</button></div>' +
+      '</td>' +
       '<td>'+(webUrl?'<a href="'+esc(webUrl)+'" target="_blank" style="color:var(--accent);text-decoration:none;font-weight:500;font-size:12px;">Link ↗</a>':'—')+'</td>' +
       '<td style="white-space:nowrap;">'+esc(f(lead,'contactName')||'—')+'</td>' +
       '<td style="white-space:nowrap;"><a href="tel:'+esc(phone)+'" style="color:var(--accent);text-decoration:none;font-weight:500;">'+esc(phone||'—')+'</a></td>' +
@@ -1628,7 +1705,7 @@ window.renderTable = function() {
     const cName = f(lead,'contactName') || '—';
     const webUrl = f(lead,'website');
     const cs = callbackStatus(lead);
-    const cbBadge = cs === 'overdue' ? '<span class="overdue-badge">⚠ Overdue</span>' : cs === 'today' ? '<span class="due-today-badge">📅 Today</span>' : '';
+    const cbBadge = cs === 'overdue' ? '<span class="overdue-badge">⚠ Overdue</span>' : cs === 'duenow' ? '<span class="due-now-badge">🔔 Due Soon</span>' : cs === 'today' ? '<span class="due-today-badge">📅 Today</span>' : '';
     const websiteEl = webUrl ? '<a href="'+esc(webUrl)+'" target="_blank" style="color:var(--accent);text-decoration:none;font-size:12px;font-weight:500;">Website ↗</a>' : '';
     const isAdminAssignedMobile = !!lead._adminAssigned;
     const adminBadgeMobile = isAdminAssignedMobile ? '<span class="admin-assigned-badge" style="margin-left:0;margin-top:4px;display:inline-flex;">⭐ Priority</span>' : '';
@@ -1637,7 +1714,9 @@ window.renderTable = function() {
         '<div><button class="btn-icon" onclick="openDetailModal(\''+lead.id+'\')"><div class="mobile-business-name">'+esc(bName)+'</div></button>' +
         (isAdminAssignedMobile?'<div style="margin-top:3px;">'+adminBadgeMobile+'</div>':'') +
         (websiteEl?'<div style="margin-top:3px;">'+websiteEl+'</div>':'') +
-        '<div class="mobile-contact-name" style="margin-top:2px;">'+esc(cName)+'</div></div>' +
+        '<div class="mobile-contact-name" style="margin-top:2px;">'+esc(cName)+'</div>' +
+        '<div style="margin-top:5px;display:flex;flex-wrap:wrap;align-items:center;gap:2px;">'+renderTagChips(lead._tags, '')+'<button class="tag-add-btn" data-id="'+lead.id+'" onclick="openTagPicker(event,this)" title="Add tag">+</button></div>' +
+        '</div>' +
         (userRole==='admin'?'<button class="btn-danger-icon" onclick="openDeleteModal(\''+lead.id+'\',\''+esc(bName).replace(/'/g,"\\'")+'\')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>':'') +
       '</div>' +
       '<div class="mobile-card-row" style="margin-top:8px;">' +
@@ -1648,7 +1727,7 @@ window.renderTable = function() {
         '<select class="status-select" data-id="'+lead.id+'" onchange="updateStatus(this)" style="background:'+col.bg+';color:'+col.text+';border-color:transparent;">'+
           STATUSES.map(s=>'<option'+(lead._status===s?' selected':'')+'>'+s+'</option>').join('')+'</select>' +
       '</div>' +
-      (lead._status==='Callback Scheduled'?'<div style="margin-top:6px;"><label style="font-size:11px;color:var(--text-muted);">Callback Date</label><input type="date" class="callback-date-input" style="margin-top:3px;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)">'+(cbBadge?'<div style="margin-top:4px;">'+cbBadge+'</div>':'')+'</div>':'') +
+      (lead._status==='Callback Scheduled'?'<div style="margin-top:6px;"><label style="font-size:11px;color:var(--text-muted);">Callback</label><div style="display:flex;gap:6px;margin-top:3px;"><input type="date" class="callback-date-input" style="flex:1;" data-id="'+lead.id+'" value="'+(lead._callbackDate||'')+'" onchange="updateCallbackDateInline(this)"><input type="time" class="callback-time-input" style="flex:1;" data-id="'+lead.id+'" value="'+(lead._callbackTime||'')+'" onchange="updateCallbackTimeInline(this)"></div>'+(cbBadge?'<div style="margin-top:4px;">'+cbBadge+'</div>':'')+'</div>':'') +
       '<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">' +
         '<input class="note-input" type="text" placeholder="Add note…" value="'+esc(lead._note||'')+'" data-id="'+lead.id+'" oninput="updateNote(this)" maxlength="200" style="max-width:100%;">' +
       '</div>' +
@@ -1662,7 +1741,7 @@ window.updateStatus = async function(sel) {
   const col = STATUS_COLORS[sel.value];
   sel.style.background = col.bg; sel.style.color = col.text;
   const updates = {_status: sel.value, _updatedAt: serverTimestamp()};
-  if (sel.value !== 'Callback Scheduled') updates._callbackDate = '';
+  if (sel.value !== 'Callback Scheduled') { updates._callbackDate = ''; updates._callbackTime = ''; }
   try {
     await updateDoc(doc(db,'leads',id), updates);
     showToast(sel.value === 'Callback Scheduled' ? 'Status updated — set the callback date →' : 'Status updated');
@@ -1678,6 +1757,89 @@ window.updateCallbackDateInline = async function(input) {
     await updateDoc(doc(db,'leads',id), {_callbackDate: input.value, _updatedAt: serverTimestamp()});
     showToast('✓ Callback date saved');
   } catch(e) { showToast('Failed to save callback date'); }
+};
+
+window.updateCallbackTimeInline = async function(input) {
+  const id = input.dataset.id;
+  try {
+    await updateDoc(doc(db,'leads',id), {_callbackTime: input.value, _updatedAt: serverTimestamp()});
+    showToast('✓ Callback time saved');
+  } catch(e) { showToast('Failed to save callback time'); }
+};
+
+// ── Tags
+function closeTagPicker() {
+  const existing = document.getElementById('tag-picker-popup');
+  if (existing) existing.remove();
+  document.removeEventListener('click', onTagPickerOutsideClick);
+}
+function onTagPickerOutsideClick(e) {
+  const popup = document.getElementById('tag-picker-popup');
+  if (!popup) return;
+  if (popup.contains(e.target) || e.target.classList.contains('tag-add-btn')) return;
+  closeTagPicker();
+}
+window.openTagPicker = function(e, btn) {
+  e.stopPropagation();
+  closeTagPicker();
+  const id = btn.dataset.id;
+  const lead = leads.find(l => l.id === id);
+  const existingTags = (lead && Array.isArray(lead._tags)) ? lead._tags : [];
+  const popup = document.createElement('div');
+  popup.id = 'tag-picker-popup';
+  popup.className = 'tag-picker-popup';
+  popup.innerHTML =
+    '<input type="text" class="tag-picker-input" id="tag-picker-custom-input" placeholder="Custom tag…" maxlength="24">' +
+    TAG_PALETTE.map(t => {
+      const already = existingTags.some(et => et.toLowerCase() === t.name.toLowerCase());
+      return '<div class="tag-picker-option" data-tag="'+esc(t.name)+'" onclick="addTagToLead(\''+id+'\',\''+esc(t.name).replace(/'/g,"\\'")+'\')" style="'+(already?'opacity:0.4;pointer-events:none;':'')+'">' +
+        '<span class="tag-picker-swatch" style="background:'+t.text+';"></span>' + esc(t.name) + (already?' ✓':'') +
+      '</div>';
+    }).join('');
+  document.body.appendChild(popup);
+  const rect = btn.getBoundingClientRect();
+  popup.style.top = (window.scrollY + rect.bottom + 4) + 'px';
+  popup.style.left = Math.min(window.scrollX + rect.left, window.scrollX + window.innerWidth - 250) + 'px';
+  const customInput = document.getElementById('tag-picker-custom-input');
+  customInput.focus();
+  customInput.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && customInput.value.trim()) {
+      addTagToLead(id, customInput.value.trim());
+    }
+  });
+  setTimeout(() => document.addEventListener('click', onTagPickerOutsideClick), 0);
+};
+window.addTagToLead = async function(id, tagName) {
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  const existing = Array.isArray(lead._tags) ? lead._tags : [];
+  if (existing.some(t => t.toLowerCase() === tagName.toLowerCase())) { closeTagPicker(); return; }
+  const updated = [...existing, tagName].slice(0, 8); // cap at 8 tags per lead
+  try {
+    await updateDoc(doc(db,'leads',id), {_tags: updated, _updatedAt: serverTimestamp()});
+    showToast('✓ Tag added');
+    if (detailLeadId === id) renderDetailBody({...lead, _tags: updated});
+  } catch(e) { showToast('Failed to add tag'); }
+  closeTagPicker();
+};
+window.removeTagFromLead = async function(id, tagName) {
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  const existing = Array.isArray(lead._tags) ? lead._tags : [];
+  const updated = existing.filter(t => t !== tagName);
+  try {
+    await updateDoc(doc(db,'leads',id), {_tags: updated, _updatedAt: serverTimestamp()});
+  } catch(e) { showToast('Failed to remove tag'); }
+};
+window.removeTagFromLeadAndRefresh = async function(id, tagName) {
+  const lead = leads.find(l => l.id === id);
+  if (!lead) return;
+  const existing = Array.isArray(lead._tags) ? lead._tags : [];
+  const updated = existing.filter(t => t !== tagName);
+  try {
+    await updateDoc(doc(db,'leads',id), {_tags: updated, _updatedAt: serverTimestamp()});
+    if (detailLeadId === id) renderDetailBody({...lead, _tags: updated});
+  } catch(e) { showToast('Failed to remove tag'); }
 };
 
 // ── Note update
@@ -1758,7 +1920,7 @@ window.applyBulkStatus = async function() {
     let b = writeBatch(db); let count = 0;
     for (const id of selectedLeadIds) {
       const updates = { _status: status, _updatedAt: serverTimestamp() };
-      if (status !== 'Callback Scheduled') updates._callbackDate = '';
+      if (status !== 'Callback Scheduled') { updates._callbackDate = ''; updates._callbackTime = ''; }
       b.update(doc(db,'leads',id), updates);
       count++;
       if (count % 499 === 0) { await b.commit(); b = writeBatch(db); }
@@ -1813,6 +1975,18 @@ function renderDetailBody(lead) {
       </div>
     </div>
 
+    <!-- Tags -->
+    <div class="detail-section">
+      <div class="detail-section-title">Tags</div>
+      <div id="detail-tags-container" style="display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        ${(Array.isArray(lead._tags) ? lead._tags : []).map(t => {
+          const c = tagColor(t);
+          return '<span class="tag-chip" style="background:'+c.bg+';color:'+c.text+';">'+esc(t)+'<span class="tag-chip-remove" onclick="removeTagFromLeadAndRefresh(\''+lead.id+'\',\''+esc(t).replace(/'/g,"\\'")+'\')">×</span></span>';
+        }).join('')}
+        <button class="tag-add-btn" data-id="${lead.id}" onclick="openTagPicker(event,this)" title="Add tag">+</button>
+      </div>
+    </div>
+
     <!-- Status & Callback -->
     <div class="detail-section">
       <div class="detail-section-title">Status & Callback</div>
@@ -1824,9 +1998,12 @@ function renderDetailBody(lead) {
           </select>
         </div>
         <div class="form-group" id="detail-callback-group" style="${lead._status==='Callback Scheduled'?'':'display:none;'}min-width:180px;">
-          <label>Callback Date</label>
-          <input type="date" id="detail-callback-date" class="callback-date-input" value="${lead._callbackDate||''}" onchange="saveCallbackDate(this.value)">
-          ${cs==='overdue'?'<span class="overdue-badge" style="margin-top:4px;">⚠ Overdue</span>':cs==='today'?'<span class="due-today-badge" style="margin-top:4px;">📅 Due Today</span>':''}
+          <label>Callback Date & Time</label>
+          <div style="display:flex;gap:6px;">
+            <input type="date" id="detail-callback-date" class="callback-date-input" style="margin-top:0;" value="${lead._callbackDate||''}" onchange="saveCallbackDate(this.value)">
+            <input type="time" id="detail-callback-time" class="callback-time-input" style="margin-top:0;" value="${lead._callbackTime||''}" onchange="saveCallbackTime(this.value)">
+          </div>
+          ${cs==='overdue'?'<span class="overdue-badge" style="margin-top:4px;">⚠ Overdue</span>':cs==='duenow'?'<span class="due-now-badge" style="margin-top:4px;">🔔 Due Soon</span>':cs==='today'?'<span class="due-today-badge" style="margin-top:4px;">📅 Due Today</span>':''}
         </div>
       </div>
     </div>
@@ -1841,9 +2018,12 @@ function renderDetailBody(lead) {
             ${STATUSES.filter(s=>s!=='Not Called').map(s=>'<option>'+s+'</option>').join('')}
           </select>
         </div>
-        <div class="form-group" id="log-callback-date-group" style="display:none;min-width:160px;">
-          <label>Callback Date</label>
-          <input type="date" id="log-callback-date" class="callback-date-input" value="${lead._callbackDate||''}">
+        <div class="form-group" id="log-callback-date-group" style="display:none;min-width:200px;">
+          <label>Callback Date & Time</label>
+          <div style="display:flex;gap:6px;">
+            <input type="date" id="log-callback-date" class="callback-date-input" style="margin-top:0;" value="${lead._callbackDate||''}">
+            <input type="time" id="log-callback-time" class="callback-time-input" style="margin-top:0;" value="${lead._callbackTime||''}">
+          </div>
         </div>
         <div class="form-group" style="flex:1;min-width:180px;">
           <label>Call Note</label>
@@ -1912,7 +2092,7 @@ window.onDetailStatusChange = async function(sel) {
 
   if (!detailLeadId) return;
   const updates = { _status: sel.value, _updatedAt: serverTimestamp() };
-  if (sel.value !== 'Callback Scheduled') updates._callbackDate = '';
+  if (sel.value !== 'Callback Scheduled') { updates._callbackDate = ''; updates._callbackTime = ''; }
   try {
     await updateDoc(doc(db,'leads',detailLeadId), updates);
     showToast('Status updated');
@@ -1925,6 +2105,14 @@ window.saveCallbackDate = async function(val) {
     await updateDoc(doc(db,'leads',detailLeadId), {_callbackDate:val, _updatedAt:serverTimestamp()});
     showToast('Callback date saved');
   } catch(e) { showToast('Error saving date'); }
+};
+
+window.saveCallbackTime = async function(val) {
+  if (!detailLeadId) return;
+  try {
+    await updateDoc(doc(db,'leads',detailLeadId), {_callbackTime:val, _updatedAt:serverTimestamp()});
+    showToast('Callback time saved');
+  } catch(e) { showToast('Error saving time'); }
 };
 
 window.addDetailNote = async function(id) {
@@ -1963,11 +2151,15 @@ window.logCall = async function(id) {
   const updates = { _callLog: newLog, _status: outcome, _updatedAt: serverTimestamp() };
   if (outcome === 'Callback Scheduled') {
     const cbDateEl = document.getElementById('log-callback-date');
+    const cbTimeEl = document.getElementById('log-callback-time');
     const cbDate = cbDateEl ? cbDateEl.value : '';
+    const cbTime = cbTimeEl ? cbTimeEl.value : '';
     if (!cbDate) { showToast('Please pick a callback date'); return; }
     updates._callbackDate = cbDate;
+    updates._callbackTime = cbTime;
   } else {
     updates._callbackDate = '';
+    updates._callbackTime = '';
   }
 
   try {
@@ -1975,7 +2167,7 @@ window.logCall = async function(id) {
     document.getElementById('log-note').value = '';
     showToast('✓ Call logged');
     // Re-render detail with updated lead (onSnapshot will update leads[] but we can update locally too)
-    const updatedLead = {...lead, _callLog: newLog, _status: outcome, _callbackDate: updates._callbackDate};
+    const updatedLead = {...lead, _callLog: newLog, _status: outcome, _callbackDate: updates._callbackDate, _callbackTime: updates._callbackTime};
     renderDetailBody(updatedLead);
   } catch(e) { showToast('Error logging call'); }
 };
@@ -2017,7 +2209,7 @@ window.saveLead = async (e) => {
       website: document.getElementById('lead-website').value.trim(),
       assignedTo: userRole==='admin' ? '' : (currentUser?currentUser.uid:''),
       assignedName: userRole==='admin' ? '' : (localStorage.getItem('user_name')||''),
-      _status:'Not Called', _note:'', _notesHistory:[], _callLog:[], _callbackDate:'',
+      _status:'Not Called', _note:'', _notesHistory:[], _callLog:[], _callbackDate:'', _callbackTime:'', _tags:[],
       _createdAt: new Date().toISOString(), _updatedAt: serverTimestamp()
     });
     closeAddLeadModal();
@@ -2062,6 +2254,7 @@ window.exportCSV = function() {
   const fCity = document.getElementById('filter-city').value;
   const fProv = document.getElementById('filter-province').value;
   const fNiche = document.getElementById('filter-niche').value;
+  const fTag = document.getElementById('filter-tag') ? document.getElementById('filter-tag').value : '';
   const fCallback = document.getElementById('filter-callback').value;
 
   let filtered = leads.filter(l => {
@@ -2074,25 +2267,28 @@ window.exportCSV = function() {
     if (fCity && f(l,'city') !== fCity) return false;
     if (fProv && f(l,'province') !== fProv) return false;
     if (fNiche && f(l,'industry') !== fNiche) return false;
+    if (fTag && !(Array.isArray(l._tags) && l._tags.includes(fTag))) return false;
     if (fCallback) {
       const cs = callbackStatus(l);
       if (fCallback === 'overdue' && cs !== 'overdue') return false;
-      if (fCallback === 'today' && cs !== 'today') return false;
+      if (fCallback === 'duenow' && cs !== 'duenow') return false;
+      if (fCallback === 'today' && cs !== 'today' && cs !== 'duenow') return false;
     }
     if (q) {
       const historyText = Array.isArray(l._notesHistory) ? l._notesHistory.map(e => e.text||'').join(' ') : '';
-      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText].join(' ').toLowerCase();
+      const tagsText = Array.isArray(l._tags) ? l._tags.join(' ') : '';
+      const hay = [f(l,'businessName'),f(l,'contactName'),f(l,'city'),f(l,'industry'),f(l,'phone'),f(l,'email'),l._note||'',historyText,tagsText].join(' ').toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
   });
 
   if (!filtered.length) { showToast('No leads to export'); return; }
-  const cols = ['Business Name','Contact Name','Phone','Email','City','Province','Industry','Website','Status','Callback Date','Note','Assigned To'];
+  const cols = ['Business Name','Contact Name','Phone','Email','City','Province','Industry','Website','Status','Callback Date','Callback Time','Tags','Note','Assigned To'];
   const rows = [cols.join(',')].concat(filtered.map(l => [
     q2(f(l,'businessName')), q2(f(l,'contactName')), q2(f(l,'phone')), q2(f(l,'email')),
     q2(f(l,'city')), q2(f(l,'province')), q2(f(l,'industry')), q2(f(l,'website')),
-    q2(l._status), q2(l._callbackDate||''), q2(l._note||''), q2(l.assignedName||'')
+    q2(l._status), q2(l._callbackDate||''), q2(l._callbackTime||''), q2((Array.isArray(l._tags)?l._tags.join('; '):'')), q2(l._note||''), q2(l.assignedName||'')
   ].join(',')));
   let nameSuffix = '';
   if (fEmployee === 'unassigned') nameSuffix = '-unassigned';
@@ -2177,7 +2373,7 @@ function bulkParseCSV(text) {
   const bGuess=bulkGuess('businessName');
   if(bGuess){
     bulkParsedLeads=bulkRawRows.map(row=>{
-      const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:''};
+      const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:'',_callbackTime:'',_tags:[]};
       BULK_TRACKER_FIELDS.forEach(f=>{const g=bulkGuess(f.key);lead[f.key]=g?(row[g]||''):'';});
       return lead;
     });
@@ -2197,7 +2393,7 @@ function bulkShowMapping(){
 window.bulkCancelMapping=function(){document.getElementById('bulk-step-mapping').style.display='none';document.getElementById('bulk-step-upload').style.display='block';document.getElementById('bulk-file-input').value='';};
 window.bulkApplyMapping=function(){
   bulkParsedLeads=bulkRawRows.map(row=>{
-    const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:''};
+    const lead={_status:'Not Called',_note:'',_notesHistory:[],_callLog:[],_callbackDate:'',_callbackTime:'',_tags:[]};
     BULK_TRACKER_FIELDS.forEach(f=>{const val=document.getElementById('bulk-map-'+f.key).value;lead[f.key]=val?(row[val]||''):'';});
     return lead;
   });
