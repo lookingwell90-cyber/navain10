@@ -68,6 +68,7 @@ header{overflow-anchor:none;background:rgba(255,255,255,0.97);border-bottom:1px 
 .live-dot.connected{color:var(--s-interested-text);background:var(--s-interested-bg);border-color:transparent;}
 .live-dot.connected::before{background:var(--s-interested-text);}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+@keyframes spin{to{transform:rotate(360deg);}}
 .header-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;font-size:13px;font-weight:600;border-radius:var(--radius);border:1px solid var(--border-strong);background:var(--bg);color:var(--text);cursor:pointer;transition:var(--transition);white-space:nowrap;text-decoration:none;box-shadow:var(--shadow-sm);}
 .btn:hover{background:var(--bg-secondary);box-shadow:var(--shadow-md);}
@@ -198,6 +199,23 @@ tr:hover td{background:var(--bg-secondary);}
 .call-log-note{font-size:13px;color:var(--text);margin-top:3px;}
 /* Callback date */
 .callback-date-input{padding:7px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;width:100%;margin-top:6px;}
+/* Call script panel */
+.script-panel{border:1px solid rgba(37,99,235,0.2);border-radius:var(--radius);background:var(--accent-bg);overflow:hidden;margin-top:2px;}
+.script-panel-header{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;cursor:pointer;user-select:none;}
+.script-panel-header:hover{background:rgba(37,99,235,0.06);}
+.script-panel-title{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:700;color:var(--accent-text);}
+.script-panel-body{padding:0 14px 14px;display:none;}
+.script-panel-body.open{display:block;}
+.script-block{margin-bottom:12px;}
+.script-block:last-child{margin-bottom:0;}
+.script-block-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:var(--text-hint);margin-bottom:5px;}
+.script-opening{font-size:13px;line-height:1.55;color:var(--text);background:var(--bg);border:1px solid var(--border-strong);border-radius:var(--radius);padding:10px 12px;font-style:italic;}
+.script-value-prop{display:flex;gap:8px;align-items:flex-start;padding:7px 10px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:6px;font-size:12.5px;line-height:1.5;color:var(--text);}
+.script-value-prop::before{content:"✓";color:var(--s-interested-text);font-weight:700;flex-shrink:0;margin-top:1px;}
+.script-objection{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:9px 12px;margin-bottom:6px;}
+.script-objection-q{font-size:12px;font-weight:700;color:var(--danger-text);margin-bottom:4px;}
+.script-objection-a{font-size:12.5px;color:var(--text);line-height:1.5;}
+.script-status-tip{font-size:12px;padding:8px 11px;background:rgba(37,99,235,0.07);border-left:3px solid var(--accent);border-radius:0 var(--radius) var(--radius) 0;color:var(--accent-text);line-height:1.5;}
 .callback-time-input{padding:7px 10px;font-size:13px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);outline:none;width:100%;margin-top:6px;}
 .callback-date-input:focus{border-color:var(--accent);}
 /* Section toggle */
@@ -1931,6 +1949,111 @@ window.applyBulkStatus = async function() {
   } catch(e) { showToast('Error: ' + e.message); }
 };
 
+// ── Call Script Library (built-in defaults, overridable via Firestore 'call_scripts' collection)
+const DEFAULT_SCRIPTS = {
+  'dental': {
+    opening: "Hi, this is [Your Name] from Navain AI — am I speaking with the owner or office manager? Great! I'll be really quick — I noticed your practice doesn't have a 24/7 receptionist answering after hours and on weekends, and I wanted to show you how we help dental clinics never miss a new patient call again.",
+    valueProps: [
+      "Our AI receptionist answers every call — day or night — books appointments directly into your calendar, and handles FAQs so your front desk can focus on in-office patients.",
+      "Practices using Navain AI see 20–35% more new patient bookings because missed calls no longer go unanswered."
+    ],
+    objections: [
+      { q: "We already have a receptionist.", a: "Absolutely — and she's probably great. Navain handles after-hours, weekends, and overflow when she's busy with in-office patients. Think of it as backup that never calls in sick." },
+      { q: "We're not interested / too busy right now.", a: "Totally understand — when is a better time? Even a 10-minute demo on our website could save your front desk hours every week. I can send you a quick video instead?" }
+    ]
+  },
+  'real estate': {
+    opening: "Hi, this is [Your Name] from Navain AI — do you have 60 seconds? I work with real estate agents in [City] to make sure every inbound lead gets responded to instantly, even when you're in a showing or with a client.",
+    valueProps: [
+      "Our AI receptionist answers buyer and seller inquiries 24/7, qualifies leads with key questions, and books showings directly — so you never lose a lead to a competitor who picked up faster.",
+      "Agents using Navain AI save 5–8 hours a week on cold call screening and after-hours inquiries."
+    ],
+    objections: [
+      { q: "I use a VA / answering service.", a: "That's great — our AI works alongside that. The difference is instant response time — our system picks up in under 2 seconds, 24/7, no hold times. VAs typically answer in minutes or hours." },
+      { q: "I'm not taking calls right now / not interested.", a: "No worries at all — can I send you a short 2-minute demo video? Agents in your area are using it and seeing a real difference. If it's not a fit, no pressure." }
+    ]
+  },
+  'hvac': {
+    opening: "Hi, this is [Your Name] from Navain AI — quick question: how many service calls do you miss after hours or when your dispatcher is tied up? We help HVAC companies capture every one of those calls automatically.",
+    valueProps: [
+      "Our AI answers emergency service calls 24/7, collects the job details, and can book service slots directly — your technicians wake up to a full schedule without you lifting a finger overnight.",
+      "HVAC companies using Navain AI capture 30–40% more leads from missed and after-hours calls, especially during peak season."
+    ],
+    objections: [
+      { q: "We have an answering service already.", a: "Most answering services just take a message — our AI actually books the appointment, asks the right diagnostic questions, and updates your system in real time. Much faster for the customer too." },
+      { q: "Too expensive / what does it cost?", a: "Great question — pricing depends on call volume, but most HVAC clients pay less than the revenue from a single recovered after-hours call. Can I send you our pricing breakdown?" }
+    ]
+  },
+  'law firm': {
+    opening: "Hi, this is [Your Name] calling from Navain AI — I'll be brief. I work with law firms to make sure every potential client who calls gets answered professionally and immediately, even when your team is in court or with a client.",
+    valueProps: [
+      "Our AI receptionist screens and captures new client inquiries 24/7, asks intake questions, and routes urgent matters appropriately — so you never miss a time-sensitive case inquiry.",
+      "Law firms using Navain AI see higher client satisfaction scores because every caller is greeted immediately with no hold time, even at 10pm."
+    ],
+    objections: [
+      { q: "We have a paralegal / secretary handling calls.", a: "Perfect — our AI handles overflow and after-hours so your paralegal can focus on billable work. We integrate smoothly alongside your existing team." },
+      { q: "Client confidentiality is a concern.", a: "Completely valid concern. Our system is HIPAA-compliant, doesn't store sensitive case details, and can be configured to only capture name, contact info, and matter type before routing to your team." }
+    ]
+  },
+  'home services': {
+    opening: "Hi, this is [Your Name] from Navain AI — I help home service businesses like yours stop losing jobs to voicemail. Do you have 60 seconds to hear how?",
+    valueProps: [
+      "Our AI answers every inbound call, qualifies the job type and location, and books estimate appointments directly — so you capture every lead even when you're on a job site.",
+      "Home service businesses using Navain AI book 25–40% more jobs because they're the first to respond, every time."
+    ],
+    objections: [
+      { q: "I'm a one-man operation, I can't afford it.", a: "That's exactly who this is built for. You can't be on a job and on the phone at the same time — our AI is like hiring a receptionist for a fraction of the cost." },
+      { q: "I already use voicemail / I'll call them back.", a: "The challenge is most customers call 2–3 businesses and book whoever calls back first. Our AI responds in seconds — so you win the job before your competitor even sees the missed call." }
+    ]
+  }
+};
+
+const STATUS_SCRIPTS = {
+  'Not Called':         'This is a fresh lead — lead with your opening line and aim to qualify within 30 seconds.',
+  'No Answer':          'No answer on previous attempt. Try calling at a different time of day. Leave a voicemail on the 2nd attempt.',
+  'Voicemail':          'Voicemail left. Try calling at a different time — mornings and late afternoons often work best. Reference your previous message if they pick up.',
+  'Interested':         'This lead showed interest! Focus on next steps — offer a demo, send pricing, or lock in a meeting time.',
+  'Callback Scheduled': 'They asked you to call back at a specific time. Be punctual — they are expecting your call. Start by reminding them who you are and why they asked you to follow up.',
+  'Not Interested':     'Previously declined. Try a soft re-approach after 30 days with a new angle or updated offer.',
+  'Wrong Number':       'Wrong number on file — double check the website or Google listing for a better contact number before calling again.',
+};
+
+let _cachedScripts = null;
+async function getCallScript(niche, status) {
+  // Try to load admin-customized scripts from Firestore (cached after first load)
+  if (!_cachedScripts) {
+    try {
+      const snap = await getDocs(collection(db, 'call_scripts'));
+      _cachedScripts = {};
+      snap.docs.forEach(d => { _cachedScripts[d.id] = d.data(); });
+    } catch(e) { _cachedScripts = {}; }
+  }
+  const nicheKey = (niche||'').toLowerCase().trim();
+  // Find best matching script: exact niche match → partial match → generic
+  let script = null;
+  // Check Firestore overrides first
+  for (const key of Object.keys(_cachedScripts)) {
+    if (nicheKey && nicheKey.includes(key.toLowerCase())) { script = _cachedScripts[key]; break; }
+  }
+  // Fall back to built-in defaults
+  if (!script) {
+    for (const key of Object.keys(DEFAULT_SCRIPTS)) {
+      if (nicheKey && nicheKey.includes(key)) { script = DEFAULT_SCRIPTS[key]; break; }
+    }
+  }
+  if (!script) script = DEFAULT_SCRIPTS['home services']; // generic fallback
+  return { ...script, statusTip: STATUS_SCRIPTS[status] || STATUS_SCRIPTS['Not Called'] };
+}
+
+window.toggleScriptPanel = function() {
+  const body = document.getElementById('script-panel-body');
+  const icon = document.getElementById('script-panel-chevron');
+  if (!body) return;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (icon) icon.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+};
+
 // ── Lead Detail Modal
 let detailLeadId = null;
 window.openDetailModal = async function(id) {
@@ -1941,6 +2064,20 @@ window.openDetailModal = async function(id) {
   const modal = document.getElementById('detail-modal');
   modal.classList.add('show');
   renderDetailBody(lead);
+  // Load call script asynchronously and inject into panel
+  try {
+    const script = await getCallScript(f(lead,'industry'), lead._status || 'Not Called');
+    const placeholder = document.getElementById('script-panel-loading');
+    if (!placeholder) return;
+    const vp = (script.valueProps || []).map(v => `<div class="script-value-prop">${esc(v)}</div>`).join('');
+    const obj = (script.objections || []).map(o => `<div class="script-objection"><div class="script-objection-q">"${esc(o.q)}"</div><div class="script-objection-a">${esc(o.a)}</div></div>`).join('');
+    placeholder.innerHTML = `
+      ${script.statusTip ? `<div class="script-block"><div class="script-block-label">Status Tip</div><div class="script-status-tip">${esc(script.statusTip)}</div></div>` : ''}
+      <div class="script-block"><div class="script-block-label">Opening Line</div><div class="script-opening">${esc(script.opening)}</div></div>
+      <div class="script-block"><div class="script-block-label">Key Value Props</div>${vp}</div>
+      <div class="script-block"><div class="script-block-label">Common Objections</div>${obj}</div>
+    `;
+  } catch(e) { /* script panel stays loading */ }
 };
 window.closeDetailModal = function() {
   document.getElementById('detail-modal').classList.remove('show');
@@ -2057,6 +2194,28 @@ function renderDetailBody(lead) {
               '</div>';
             }).join('')
         }
+      </div>
+    </div>
+
+    <!-- Call Script Panel -->
+    <div class="detail-section">
+      <div class="detail-section-title">Call Script</div>
+      <div class="script-panel">
+        <div class="script-panel-header" onclick="toggleScriptPanel()">
+          <div class="script-panel-title">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+            Call Script — ${esc(f(lead,'industry') || 'General')}
+          </div>
+          <svg id="script-panel-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent-text);flex-shrink:0;transition:transform 0.2s;"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="script-panel-body" id="script-panel-body">
+          <div id="script-panel-loading" style="padding:8px 0;">
+            <div style="font-size:12.5px;color:var(--text-hint);display:flex;align-items:center;gap:7px;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="animation:spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+              Loading script…
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
