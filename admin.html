@@ -520,6 +520,70 @@
     </div>
   </div>
 
+  <div class="card" id="call-scripts-card" style="display:none;">
+    <div class="card-title">
+      Call Script Library
+      <span style="font-size:11px;font-weight:500;color:var(--text-hint);text-transform:none;letter-spacing:normal;">Customise scripts shown to agents in lead detail modal</span>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:18px;">Each niche has an opening line, 2 value props, and 2 objection handlers. Agents see these in the Call Script panel when they open a lead. Leave blank to use built-in defaults.</p>
+
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
+      <select id="script-niche-select" onchange="loadScriptForNiche()" style="padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;cursor:pointer;min-width:200px;">
+        <option value="">— Select a niche to edit —</option>
+        <option value="dental">Dental Clinic</option>
+        <option value="real estate">Real Estate</option>
+        <option value="hvac">HVAC</option>
+        <option value="law firm">Law Firm</option>
+        <option value="home services">Home Services / General</option>
+        <option value="custom">+ Add custom niche…</option>
+      </select>
+      <input type="text" id="script-custom-niche" placeholder="Enter niche name (e.g. Chiropractic)" style="display:none;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;min-width:220px;">
+    </div>
+
+    <div id="script-editor-body" style="display:none;">
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Opening Line</label>
+          <textarea id="se-opening" rows="3" placeholder="Hi, this is [Name] from Navain AI…" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;margin-top:6px;"></textarea>
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Value Prop 1</label>
+          <textarea id="se-vp1" rows="2" placeholder="Key benefit for this industry…" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;margin-top:6px;"></textarea>
+        </div>
+        <div class="form-group">
+          <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;">Value Prop 2</label>
+          <textarea id="se-vp2" rows="2" placeholder="Second key benefit…" style="width:100%;padding:10px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;margin-top:6px;"></textarea>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">Objection 1 — What they say</label>
+            <input type="text" id="se-obj1q" placeholder="e.g. We already have a receptionist." style="width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin:10px 0 6px;">Your Response</label>
+            <textarea id="se-obj1a" rows="2" placeholder="Your response to this objection…" style="width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px;">Objection 2 — What they say</label>
+            <input type="text" id="se-obj2q" placeholder="e.g. Not interested right now." style="width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;">
+            <label style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin:10px 0 6px;">Your Response</label>
+            <textarea id="se-obj2a" rows="2" placeholder="Your response to this objection…" style="width:100%;padding:9px 12px;border:1px solid var(--border-strong);border-radius:var(--radius);background:var(--bg);color:var(--text);font-size:13px;outline:none;resize:vertical;font-family:inherit;box-sizing:border-box;"></textarea>
+          </div>
+        </div>
+        <div id="script-save-alert" style="min-height:16px;"></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <button class="btn btn-primary" onclick="saveCallScript()" style="padding:9px 20px;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save Script
+          </button>
+          <button class="btn" onclick="resetCallScript()" style="padding:9px 16px;font-size:13px;color:var(--danger-text);">Reset to Default</button>
+        </div>
+      </div>
+    </div>
+    <div id="script-saved-niches" style="margin-top:18px;border-top:1px solid var(--border);padding-top:14px;display:none;">
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">Customised Scripts in Firestore</div>
+      <div id="script-saved-list" style="display:flex;flex-wrap:wrap;gap:6px;"></div>
+    </div>
+  </div>
+
   <div class="card">
     <div class="card-title">Upload Dataset</div>
     <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
@@ -676,6 +740,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('assign-task-card').style.display = 'block';
     document.getElementById('activity-feed-card').classList.remove('hidden');
     document.getElementById('dashboard-nav-link').classList.remove('hidden');
+    document.getElementById('call-scripts-card').style.display = 'block';
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
     await loadEmployees();
@@ -751,6 +816,115 @@ async function loadEmployees() {
     console.error("Error loading employees", err);
     document.getElementById('employees-list').innerHTML = '<p style="font-size: 13px; color: var(--danger-text);">Error loading employees.</p>';
   }
+}
+
+// ── Call Script Editor
+const SCRIPT_DEFAULTS = {
+  'dental':        { opening:"Hi, this is [Your Name] from Navain AI — am I speaking with the owner or office manager? Great! I'll be really quick — I noticed your practice doesn't have a 24/7 receptionist answering after hours and on weekends, and I wanted to show you how we help dental clinics never miss a new patient call again.", valueProps:["Our AI receptionist answers every call — day or night — books appointments directly into your calendar, and handles FAQs so your front desk can focus on in-office patients.","Practices using Navain AI see 20–35% more new patient bookings because missed calls no longer go unanswered."], objections:[{q:"We already have a receptionist.",a:"Absolutely — and she's probably great. Navain handles after-hours, weekends, and overflow when she's busy with in-office patients. Think of it as backup that never calls in sick."},{q:"We're not interested / too busy right now.",a:"Totally understand — when is a better time? Even a 10-minute demo on our website could save your front desk hours every week. I can send you a quick video instead?"}] },
+  'real estate':   { opening:"Hi, this is [Your Name] from Navain AI — do you have 60 seconds? I work with real estate agents in [City] to make sure every inbound lead gets responded to instantly, even when you're in a showing or with a client.", valueProps:["Our AI receptionist answers buyer and seller inquiries 24/7, qualifies leads with key questions, and books showings directly — so you never lose a lead to a competitor who picked up faster.","Agents using Navain AI save 5–8 hours a week on cold call screening and after-hours inquiries."], objections:[{q:"I use a VA / answering service.",a:"That's great — our AI works alongside that. The difference is instant response time — our system picks up in under 2 seconds, 24/7, no hold times. VAs typically answer in minutes or hours."},{q:"I'm not taking calls right now / not interested.",a:"No worries at all — can I send you a short 2-minute demo video? Agents in your area are using it and seeing a real difference. If it's not a fit, no pressure."}] },
+  'hvac':          { opening:"Hi, this is [Your Name] from Navain AI — quick question: how many service calls do you miss after hours or when your dispatcher is tied up? We help HVAC companies capture every one of those calls automatically.", valueProps:["Our AI answers emergency service calls 24/7, collects the job details, and can book service slots directly — your technicians wake up to a full schedule without you lifting a finger overnight.","HVAC companies using Navain AI capture 30–40% more leads from missed and after-hours calls, especially during peak season."], objections:[{q:"We have an answering service already.",a:"Most answering services just take a message — our AI actually books the appointment, asks the right diagnostic questions, and updates your system in real time. Much faster for the customer too."},{q:"Too expensive / what does it cost?",a:"Great question — pricing depends on call volume, but most HVAC clients pay less than the revenue from a single recovered after-hours call. Can I send you our pricing breakdown?"}] },
+  'law firm':      { opening:"Hi, this is [Your Name] calling from Navain AI — I'll be brief. I work with law firms to make sure every potential client who calls gets answered professionally and immediately, even when your team is in court or with a client.", valueProps:["Our AI receptionist screens and captures new client inquiries 24/7, asks intake questions, and routes urgent matters appropriately — so you never miss a time-sensitive case inquiry.","Law firms using Navain AI see higher client satisfaction scores because every caller is greeted immediately with no hold time, even at 10pm."], objections:[{q:"We have a paralegal / secretary handling calls.",a:"Perfect — our AI handles overflow and after-hours so your paralegal can focus on billable work. We integrate smoothly alongside your existing team."},{q:"Client confidentiality is a concern.",a:"Completely valid concern. Our system is HIPAA-compliant, doesn't store sensitive case details, and can be configured to only capture name, contact info, and matter type before routing to your team."}] },
+  'home services': { opening:"Hi, this is [Your Name] from Navain AI — I help home service businesses like yours stop losing jobs to voicemail. Do you have 60 seconds to hear how?", valueProps:["Our AI answers every inbound call, qualifies the job type and location, and books estimate appointments directly — so you capture every lead even when you're on a job site.","Home service businesses using Navain AI book 25–40% more jobs because they're the first to respond, every time."], objections:[{q:"I'm a one-man operation, I can't afford it.",a:"That's exactly who this is built for. You can't be on a job and on the phone at the same time — our AI is like hiring a receptionist for a fraction of the cost."},{q:"I already use voicemail / I'll call them back.",a:"The challenge is most customers call 2–3 businesses and book whoever calls back first. Our AI responds in seconds — so you win the job before your competitor even sees the missed call."}] },
+};
+
+document.getElementById('script-niche-select').addEventListener('change', function() {
+  const customInput = document.getElementById('script-custom-niche');
+  customInput.style.display = this.value === 'custom' ? 'inline-block' : 'none';
+  loadScriptForNiche();
+});
+
+window.loadScriptForNiche = async function() {
+  const sel = document.getElementById('script-niche-select').value;
+  if (!sel) { document.getElementById('script-editor-body').style.display = 'none'; return; }
+  document.getElementById('script-editor-body').style.display = 'block';
+  if (sel === 'custom') { clearScriptFields(); return; }
+  // Try Firestore first, then fall back to built-in defaults
+  let data = null;
+  try {
+    const snap = await getDocs(collection(db, 'call_scripts'));
+    snap.docs.forEach(d => { if (d.id === sel) data = d.data(); });
+  } catch(e) {}
+  if (!data) data = SCRIPT_DEFAULTS[sel] || null;
+  if (data) {
+    document.getElementById('se-opening').value = data.opening || '';
+    document.getElementById('se-vp1').value = (data.valueProps && data.valueProps[0]) || '';
+    document.getElementById('se-vp2').value = (data.valueProps && data.valueProps[1]) || '';
+    document.getElementById('se-obj1q').value = (data.objections && data.objections[0] && data.objections[0].q) || '';
+    document.getElementById('se-obj1a').value = (data.objections && data.objections[0] && data.objections[0].a) || '';
+    document.getElementById('se-obj2q').value = (data.objections && data.objections[1] && data.objections[1].q) || '';
+    document.getElementById('se-obj2a').value = (data.objections && data.objections[1] && data.objections[1].a) || '';
+  } else { clearScriptFields(); }
+  document.getElementById('script-save-alert').innerHTML = '';
+  await loadSavedScriptNiches();
+};
+
+function clearScriptFields() {
+  ['se-opening','se-vp1','se-vp2','se-obj1q','se-obj1a','se-obj2q','se-obj2a'].forEach(id => { document.getElementById(id).value = ''; });
+}
+
+async function loadSavedScriptNiches() {
+  try {
+    const snap = await getDocs(collection(db, 'call_scripts'));
+    const list = document.getElementById('script-saved-list');
+    const wrap = document.getElementById('script-saved-niches');
+    if (snap.empty) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    list.innerHTML = snap.docs.map(d =>
+      `<span style="display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 12px;background:var(--accent-bg);color:var(--accent-text);border:1px solid rgba(37,99,235,0.2);border-radius:20px;font-size:12px;font-weight:600;">
+        ${esc(d.id)}
+        <button onclick="deleteScriptNiche('${esc(d.id)}')" style="background:none;border:none;cursor:pointer;color:var(--accent-text);font-size:14px;line-height:1;padding:0;opacity:0.6;" title="Delete custom script">×</button>
+      </span>`
+    ).join('');
+  } catch(e) {}
+}
+
+window.saveCallScript = async function() {
+  let niche = document.getElementById('script-niche-select').value;
+  if (niche === 'custom') niche = document.getElementById('script-custom-niche').value.trim().toLowerCase();
+  if (!niche) { scriptAlert('Please select or enter a niche.', 'danger'); return; }
+  const opening = document.getElementById('se-opening').value.trim();
+  const vp1 = document.getElementById('se-vp1').value.trim();
+  const vp2 = document.getElementById('se-vp2').value.trim();
+  const obj1q = document.getElementById('se-obj1q').value.trim();
+  const obj1a = document.getElementById('se-obj1a').value.trim();
+  const obj2q = document.getElementById('se-obj2q').value.trim();
+  const obj2a = document.getElementById('se-obj2a').value.trim();
+  if (!opening) { scriptAlert('Opening line is required.', 'danger'); return; }
+  try {
+    await setDoc(doc(db, 'call_scripts', niche), {
+      opening, valueProps: [vp1, vp2].filter(Boolean),
+      objections: [{q:obj1q, a:obj1a},{q:obj2q, a:obj2a}].filter(o => o.q),
+      updatedAt: new Date().toISOString()
+    });
+    scriptAlert('✓ Script saved for "' + niche + '"', 'success');
+    await loadSavedScriptNiches();
+  } catch(e) { scriptAlert('Error saving: ' + e.message, 'danger'); }
+};
+
+window.resetCallScript = async function() {
+  const niche = document.getElementById('script-niche-select').value;
+  if (!niche || niche === 'custom') { scriptAlert('Select a built-in niche to reset.', 'danger'); return; }
+  if (!confirm('Delete custom script for "' + niche + '" and restore the default?')) return;
+  try {
+    await deleteDoc(doc(db, 'call_scripts', niche));
+    scriptAlert('✓ Reset to default', 'success');
+    loadScriptForNiche();
+  } catch(e) { scriptAlert('Error resetting: ' + e.message, 'danger'); }
+};
+
+window.deleteScriptNiche = async function(niche) {
+  if (!confirm('Delete custom script for "' + niche + '"?')) return;
+  try {
+    await deleteDoc(doc(db, 'call_scripts', niche));
+    showToast('✓ Script deleted');
+    await loadSavedScriptNiches();
+  } catch(e) { showToast('Error: ' + e.message); }
+};
+
+function scriptAlert(msg, type) {
+  const colors = { success: 'var(--success-text)', danger: 'var(--danger-text)' };
+  const bgs = { success: 'var(--success-bg)', danger: 'var(--danger-bg)' };
+  document.getElementById('script-save-alert').innerHTML = `<div style="padding:8px 12px;border-radius:var(--radius);background:${bgs[type]};color:${colors[type]};font-size:12.5px;">${msg}</div>`;
 }
 
 window.deleteEmployee = async (uid, name) => {
