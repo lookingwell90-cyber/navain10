@@ -1,7 +1,7 @@
 {
-  "name": "Navain AI — Lead Tracker",
-  "short_name": "Navain AI",
-  "description": "Navain AI Lead Tracker — manage and track leads in real time.",
+  "name": "Partechnologys — Lead Tracker",
+  "short_name": "Partechnologys",
+  "description": "Partechnologys Lead Tracker — manage and track leads in real time.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
