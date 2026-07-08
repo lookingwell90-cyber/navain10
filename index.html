@@ -298,6 +298,27 @@ tr:hover td{background:var(--bg-secondary);}
     </div>
   </div>
 
+  <!-- Start/End Shift Section -->
+  <div id="shift-section" style="margin-bottom:20px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+      <button id="start-shift-btn" class="btn btn-accent" onclick="toggleStartShift()" style="font-size:14px;padding:10px 18px;">
+        ▶ Start Shift
+      </button>
+      <span id="shift-status" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
+    </div>
+  </div>
+
+  <!-- Customizable Dashboard Widgets -->
+  <div id="dashboard-section" style="margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">📊 Dashboard Widgets</h2>
+      <button id="customize-dashboard-btn" class="btn btn-secondary-action" onclick="toggleDashboardCustomize()" style="font-size:12px;">
+        ⚙ Customize
+      </button>
+    </div>
+    <div id="widgets-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;"></div>
+  </div>
+
   <!-- Agent Performance (admin only) -->
   <div id="perf-section" style="display:none;margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -403,7 +424,7 @@ tr:hover td{background:var(--bg-secondary);}
       <thead>
         <tr>
           <th><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)" title="Select all"></th>
-          <th>#</th><th>Business</th><th>Link</th><th>Contact</th><th>Phone</th>
+          <th>#</th><th>Personal #</th><th>Business</th><th>Link</th><th>Contact</th><th>Phone</th>
           <th>City</th><th>Province</th><th>Local Time</th><th>Niche</th><th>Status</th>
           <th>Callback Date</th><th>Note</th><th>Assigned</th><th>Updated</th><th></th>
         </tr>
@@ -1657,7 +1678,7 @@ window.renderTable = function() {
 
   const tbody = document.getElementById('tbody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
     mobileList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-hint);font-size:13px;">No leads match filters.</div>';
     return;
   }
@@ -1691,9 +1712,11 @@ window.renderTable = function() {
       assignCell = '<td style="font-size:12px;color:var(--text-muted);">'+esc(lead.assignedName||'—')+'</td>';
     }
 
+    const personelLeadNum = getLeadNumber(lead);
     return '<tr class="'+(isAdminAssigned?'admin-assigned-row':'')+'" style="'+(isSelected?'background:var(--accent-bg);':'')+'">' +
       '<td><input type="checkbox" class="lead-cb" data-id="'+lead.id+'" onchange="toggleLeadSelect(this)" '+(isSelected?'checked':'')+' '+(userRole!=='admin'?'style="display:none"':'')+'/></td>' +
       '<td style="color:var(--text-hint);font-size:12px;">'+(idx+1)+'</td>' +
+      '<td style="color:var(--accent);font-weight:600;font-size:12px;">'+personelLeadNum+'</td>' +
       '<td style="font-weight:600;max-width:170px;white-space:normal;" title="'+esc(bName)+'"><button class="btn-icon" onclick="openDetailModal(\''+lead.id+'\')" title="View details" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:170px;">'+esc(bName)+'</button>'+adminBadge+
         '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:2px;">'+renderTagChips(lead._tags, '')+'<button class="tag-add-btn" data-id="'+lead.id+'" onclick="openTagPicker(event,this)" title="Add tag">+</button></div>' +
       '</td>' +
@@ -1756,12 +1779,14 @@ window.renderTable = function() {
 // ── Status update
 window.updateStatus = async function(sel) {
   const id = sel.dataset.id;
+  const lead = leads.find(l => l.id === id);
   const col = STATUS_COLORS[sel.value];
   sel.style.background = col.bg; sel.style.color = col.text;
   const updates = {_status: sel.value, _updatedAt: serverTimestamp()};
   if (sel.value !== 'Callback Scheduled') { updates._callbackDate = ''; updates._callbackTime = ''; }
   try {
     await updateDoc(doc(db,'leads',id), updates);
+    if (lead) updateShiftMetrics(lead, sel.value);
     showToast(sel.value === 'Callback Scheduled' ? 'Status updated — set the callback date →' : 'Status updated');
   }
   catch(e) { showToast('Failed to save'); }
@@ -2667,6 +2692,347 @@ window.markTaskRead = async function(taskId) {
     if(currentUser) loadEmployeeTasks(currentUser.uid);
   } catch(e){console.error(e);}
 };
+
+// ── SHIFT MANAGEMENT (Personal Lead Numbering & Shift Tracking)
+let currentShift = null;
+let shiftStartTime = null;
+let leadCounter = {};
+
+// Load shift data on startup
+async function loadShiftData() {
+  if (!currentUser) return;
+  try {
+    const shiftDoc = await getDoc(doc(db, 'shifts', currentUser.uid));
+    if (shiftDoc.exists()) {
+      const data = shiftDoc.data();
+      if (data.isActive) {
+        currentShift = data;
+        shiftStartTime = data.startTime;
+        updateShiftUI();
+      }
+    }
+    // Load lead counter
+    const counterDoc = await getDoc(doc(db, 'leadCounters', currentUser.uid));
+    if (counterDoc.exists()) {
+      leadCounter = counterDoc.data();
+    } else {
+      leadCounter = { count: 0 };
+    }
+  } catch(e) { console.error('Error loading shift data:', e); }
+}
+
+// Start/End Shift Toggle
+window.toggleStartShift = async function() {
+  if (!currentUser) return;
+  try {
+    if (currentShift && currentShift.isActive) {
+      // End Shift
+      const endTime = new Date();
+      const shiftDoc = { ...currentShift, endTime, isActive: false };
+      await setDoc(doc(db, 'shifts', currentUser.uid), shiftDoc);
+      
+      // Create shift summary
+      await generateShiftSummary(currentShift, shiftDoc);
+      
+      currentShift = null;
+      shiftStartTime = null;
+      updateShiftUI();
+      showToast('✓ Shift ended');
+    } else {
+      // Start Shift
+      const startTime = new Date();
+      currentShift = {
+        userId: currentUser.uid,
+        userName: localStorage.getItem('user_name'),
+        startTime,
+        isActive: true,
+        calls: 0,
+        contacts: 0,
+        interested: 0,
+        demos: 0
+      };
+      shiftStartTime = startTime;
+      leadCounter.count = 0;
+      await setDoc(doc(db, 'shifts', currentUser.uid), currentShift);
+      await setDoc(doc(db, 'leadCounters', currentUser.uid), leadCounter);
+      updateShiftUI();
+      showToast('✓ Shift started');
+    }
+  } catch(e) {
+    showToast('Error: ' + e.message);
+    console.error(e);
+  }
+};
+
+function updateShiftUI() {
+  const btn = document.getElementById('start-shift-btn');
+  const status = document.getElementById('shift-status');
+  
+  if (currentShift && currentShift.isActive) {
+    btn.textContent = '⏹ End Shift';
+    btn.style.background = 'var(--danger-bg)';
+    btn.style.color = 'var(--danger-text)';
+    btn.style.borderColor = 'transparent';
+    const elapsed = Math.floor((new Date() - shiftStartTime) / 60000);
+    const hours = Math.floor(elapsed / 60);
+    const mins = elapsed % 60;
+    status.textContent = `Active • ${hours}h ${mins}m`;
+  } else {
+    btn.textContent = '▶ Start Shift';
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#fff';
+    btn.style.borderColor = 'var(--accent)';
+    status.textContent = 'No active shift';
+  }
+}
+
+// Update shift counter on lead status change
+async function updateShiftMetrics(lead, newStatus) {
+  if (!currentShift || !currentShift.isActive) return;
+  try {
+    const oldStatus = lead._status;
+    const updates = {};
+    
+    if (!oldStatus && newStatus !== 'Not Called') updates.calls = (currentShift.calls || 0) + 1;
+    if (newStatus === 'Interested') {
+      updates.interested = (currentShift.interested || 0) + 1;
+      updates.contacts = (currentShift.contacts || 0) + 1;
+    }
+    if (newStatus === 'Callback Scheduled') {
+      updates.demos = (currentShift.demos || 0) + 1;
+    }
+    
+    if (Object.keys(updates).length > 0) {
+      currentShift = { ...currentShift, ...updates };
+      await updateDoc(doc(db, 'shifts', currentUser.uid), updates);
+    }
+  } catch(e) { console.error('Error updating shift metrics:', e); }
+}
+
+// Assign Personal Lead Numbers (Hafsa #1-50, Usaid #1-50)
+function getLeadNumber(lead) {
+  if (lead._leadNumber) return lead._leadNumber;
+  
+  const agent = lead.assignedTo ? employees.find(e => e.uid === lead.assignedTo)?.name : 'Unassigned';
+  if (!agent) return '—';
+  
+  const agentLeads = leads.filter(l => l.assignedTo === lead.assignedTo && !l._adminAssigned);
+  const index = agentLeads.indexOf(lead) + 1;
+  return index <= 50 ? `${agent} #${index}` : '—';
+}
+
+// Generate Shift Summary Report
+async function generateShiftSummary(startShift, endShift) {
+  try {
+    const summary = {
+      userId: currentUser.uid,
+      userName: localStorage.getItem('user_name'),
+      date: new Date().toISOString().slice(0, 10),
+      startTime: startShift.startTime,
+      endTime: endShift.endTime,
+      duration: Math.round((endShift.endTime - startShift.startTime) / 60000),
+      calls: endShift.calls || 0,
+      contacts: endShift.contacts || 0,
+      interested: endShift.interested || 0,
+      demos: endShift.demos || 0
+    };
+    
+    await addDoc(collection(db, 'shiftSummaries'), summary);
+    showShiftSummaryModal(summary);
+  } catch(e) { console.error('Error generating shift summary:', e); }
+}
+
+function showShiftSummaryModal(summary) {
+  const html = `
+    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
+      <div class="modal-content" style="max-width:420px;">
+        <div class="modal-header">
+          <h2>Shift Summary</h2>
+          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
+        </div>
+        <div style="padding:20px;">
+          <div style="display:grid;gap:12px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Duration</span>
+              <span style="font-size:16px;font-weight:700;color:var(--text);">${Math.floor(summary.duration/60)}h ${summary.duration%60}m</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Calls Made</span>
+              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.calls}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Contacts Made</span>
+              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.contacts}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Interested Leads</span>
+              <span style="font-size:16px;font-weight:700;color:var(--s-interested-text);">${summary.interested}</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
+              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Demos Booked</span>
+              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.demos}</span>
+            </div>
+          </div>
+          <div class="modal-footer" style="margin-top:20px;">
+            <button class="btn btn-accent" onclick="this.closest('.modal-overlay').remove()">Done</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+// ── CUSTOMIZABLE DASHBOARD WIDGETS
+const DEFAULT_WIDGETS = [
+  { id: 'total-leads', name: 'Total Leads', enabled: true },
+  { id: 'call-rate', name: 'Call Rate %', enabled: true },
+  { id: 'interested', name: 'Interested', enabled: true },
+  { id: 'callbacks', name: 'Callbacks', enabled: true },
+  { id: 'shift-status', name: 'Shift Status', enabled: true }
+];
+
+let dashboardWidgets = [...DEFAULT_WIDGETS];
+
+function loadDashboardPrefs() {
+  const saved = localStorage.getItem('dashboardWidgets');
+  if (saved) {
+    try {
+      dashboardWidgets = JSON.parse(saved);
+    } catch(e) {
+      dashboardWidgets = [...DEFAULT_WIDGETS];
+    }
+  }
+  renderWidgets();
+}
+
+function renderWidgets() {
+  const container = document.getElementById('widgets-container');
+  container.innerHTML = '';
+  
+  dashboardWidgets.filter(w => w.enabled).forEach((widget, idx) => {
+    let content = '';
+    let stat = '';
+    
+    if (widget.id === 'total-leads') {
+      const total = leads.length;
+      stat = total.toString();
+      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}</div>`;
+    } else if (widget.id === 'call-rate') {
+      const total = leads.length;
+      const called = leads.filter(l => l._status && l._status !== 'Not Called').length;
+      stat = total > 0 ? Math.round((called/total)*100) : 0;
+      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}%</div>`;
+    } else if (widget.id === 'interested') {
+      stat = leads.filter(l => l._status === 'Interested').length;
+      content = `<div style="font-size:28px;font-weight:700;color:var(--s-interested-text);">${stat}</div>`;
+    } else if (widget.id === 'callbacks') {
+      stat = leads.filter(l => l._status === 'Callback Scheduled').length;
+      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}</div>`;
+    } else if (widget.id === 'shift-status') {
+      const isActive = currentShift && currentShift.isActive;
+      content = `<div style="font-size:14px;color:var(--text-muted);">${isActive ? '🟢 Active' : '⚫ Offline'}</div>`;
+    }
+    
+    const widget_el = document.createElement('div');
+    widget_el.draggable = true;
+    widget_el.id = 'widget-' + widget.id;
+    widget_el.style.cssText = `
+      background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+      padding:20px;box-shadow:var(--shadow-md);cursor:grab;transition:var(--transition);
+    `;
+    widget_el.innerHTML = `
+      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:12px;">${widget.name}</div>
+      ${content}
+    `;
+    widget_el.addEventListener('dragstart', handleDragStart);
+    widget_el.addEventListener('dragover', handleDragOver);
+    widget_el.addEventListener('drop', handleDrop);
+    widget_el.addEventListener('dragend', handleDragEnd);
+    container.appendChild(widget_el);
+  });
+}
+
+let draggedElement = null;
+function handleDragStart(e) {
+  draggedElement = this;
+  this.style.opacity = '0.5';
+  e.dataTransfer.effectAllowed = 'move';
+}
+function handleDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  if (this !== draggedElement) {
+    this.style.transform = 'scale(1.02)';
+  }
+}
+function handleDrop(e) {
+  e.preventDefault();
+  if (this !== draggedElement) {
+    const container = document.getElementById('widgets-container');
+    const allWidgets = Array.from(container.children);
+    const draggedIdx = allWidgets.indexOf(draggedElement);
+    const thisIdx = allWidgets.indexOf(this);
+    
+    if (draggedIdx < thisIdx) {
+      this.parentNode.insertBefore(draggedElement, this.nextSibling);
+    } else {
+      this.parentNode.insertBefore(draggedElement, this);
+    }
+    saveDashboardOrder();
+  }
+}
+function handleDragEnd(e) {
+  this.style.opacity = '1';
+  this.style.transform = 'scale(1)';
+  Array.from(document.getElementById('widgets-container').children).forEach(el => {
+    el.style.transform = 'scale(1)';
+  });
+}
+
+function saveDashboardOrder() {
+  const container = document.getElementById('widgets-container');
+  const order = Array.from(container.children).map(el => {
+    const id = el.id.replace('widget-', '');
+    return dashboardWidgets.find(w => w.id === id);
+  });
+  dashboardWidgets = order;
+  localStorage.setItem('dashboardWidgets', JSON.stringify(dashboardWidgets));
+}
+
+window.toggleDashboardCustomize = function() {
+  const container = document.getElementById('widgets-container');
+  const btn = document.getElementById('customize-dashboard-btn');
+  const isCustomizing = container.style.opacity === '0.6';
+  
+  if (isCustomizing) {
+    container.style.opacity = '1';
+    container.style.pointerEvents = 'auto';
+    btn.textContent = '⚙ Customize';
+  } else {
+    container.style.opacity = '0.6';
+    container.style.pointerEvents = 'auto';
+    btn.textContent = '✓ Done';
+  }
+};
+
+// Update shift every second
+setInterval(() => {
+  if (currentShift && currentShift.isActive) {
+    updateShiftUI();
+  }
+}, 1000);
+
+// Load dashboard prefs and shift data on auth
+const origAuthCallback = onAuthStateChanged.toString();
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    setTimeout(() => {
+      loadDashboardPrefs();
+      loadShiftData();
+    }, 500);
+  }
+});
 
 window.exportCSV = window.exportCSV;
 window.renderTable = window.renderTable;
