@@ -2707,7 +2707,9 @@ async function loadShiftData() {
       const data = shiftDoc.data();
       if (data.isActive) {
         currentShift = data;
-        shiftStartTime = data.startTime;
+        shiftStartTime = data.startTime && typeof data.startTime.toDate === 'function' 
+  ? data.startTime.toDate() 
+  : new Date(data.startTime);  // Proper Date - CORRECT
         updateShiftUI();
       }
     }
@@ -2773,7 +2775,9 @@ function updateShiftUI() {
     btn.style.background = 'var(--danger-bg)';
     btn.style.color = 'var(--danger-text)';
     btn.style.borderColor = 'transparent';
-    const elapsed = Math.floor((new Date() - shiftStartTime) / 60000);
+    const startDate = shiftStartTime instanceof Date ? shiftStartTime : new Date(shiftStartTime);
+    const elapsed = Math.floor((new Date() - startDate) / 60000);
+// Now handles both Date and Timestamp safely
     const hours = Math.floor(elapsed / 60);
     const mins = elapsed % 60;
     status.textContent = `Active • ${hours}h ${mins}m`;
@@ -2830,7 +2834,15 @@ async function generateShiftSummary(startShift, endShift) {
       date: new Date().toISOString().slice(0, 10),
       startTime: startShift.startTime,
       endTime: endShift.endTime,
-      duration: Math.round((endShift.endTime - startShift.startTime) / 60000),
+      const startTime = startShift.startTime && typeof startShift.startTime.toDate === 'function' 
+  ? startShift.startTime.toDate() 
+  : new Date(startShift.startTime);
+const endTime = endShift.endTime && typeof endShift.endTime.toDate === 'function' 
+  ? endShift.endTime.toDate() 
+  : new Date(endShift.endTime);
+
+const durationMinutes = Math.round((endTime - startTime) / 60000);
+// Now properly calculates duration
       calls: endShift.calls || 0,
       contacts: endShift.contacts || 0,
       interested: endShift.interested || 0,
