@@ -2007,7 +2007,12 @@ async function loadActiveShifts() {
     }
     
     container.innerHTML = activeShifts.map(shift => {
-      const elapsed = Math.floor((new Date() - shift.startTime) / 60000);
+      const startDate = shift.startTime && typeof shift.startTime.toDate === 'function' 
+  ? shift.startTime.toDate() 
+  : new Date(shift.startTime);
+
+const elapsed = Math.floor((new Date() - startDate) / 60000);
+// Now correctly handles Firestore Timestamps
       const hours = Math.floor(elapsed / 60);
       const mins = elapsed % 60;
       return `
