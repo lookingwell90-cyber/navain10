@@ -1468,44 +1468,59 @@ onAuthStateChanged(auth, async (user) => {
   currentUser = user;
   userRole = localStorage.getItem('user_role');
   const userName = localStorage.getItem('user_name') || 'User';
-  document.getElementById('user-display').textContent = userName + ` (${userRole==='admin'?'Admin':'Agent'})`;
+  let userDisplayEl = document.getElementById('user-display');
+  if (userDisplayEl) userDisplayEl.textContent = userName + ` (${userRole==='admin'?'Admin':'Agent'})`;
 
   if (userRole === 'admin') {
-    document.getElementById('admin-portal-btn-label').textContent = 'Admin Portal';
-    document.getElementById('admin-portal-btn').classList.remove('hidden');
-    document.getElementById('filter-employee').classList.remove('hidden');
-    document.getElementById('export-employee-select').classList.remove('hidden');
-    document.getElementById('support-banner').style.display = 'none';
-    document.getElementById('tasks-inbox').style.display = 'none';
-    document.getElementById('perf-section').style.display = 'block';
-    document.getElementById('stat-calls-today-card').style.display = '';
+    // Safe DOM updates with null checks
+    let el;
+    if ((el = document.getElementById('admin-portal-btn-label'))) el.textContent = 'Admin Portal';
+    if ((el = document.getElementById('admin-portal-btn'))) el.classList.remove('hidden');
+    if ((el = document.getElementById('filter-employee'))) el.classList.remove('hidden');
+    if ((el = document.getElementById('export-employee-select'))) el.classList.remove('hidden');
+    if ((el = document.getElementById('support-banner'))) el.style.display = 'none';
+    if ((el = document.getElementById('tasks-inbox'))) el.style.display = 'none';
+    if ((el = document.getElementById('perf-section'))) el.style.display = 'block';
+    if ((el = document.getElementById('stat-calls-today-card'))) el.style.display = '';
+    
     // Load admin data non-blocking (don't await, let it run in background)
     (async () => {
       try {
         const usersSnap = await getDocs(collection(db, 'users'));
         employees = usersSnap.docs.map(d => d.data());
         const filterEmp = document.getElementById('filter-employee');
-        filterEmp.innerHTML = '<option value="">All Accounts</option><option value="unassigned">Unassigned</option>' +
-          employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
+        if (filterEmp) {
+          filterEmp.innerHTML = '<option value="">All Accounts</option><option value="unassigned">Unassigned</option>' +
+            employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
+        }
         const bulkSel = document.getElementById('bulk-reassign-select');
-        bulkSel.innerHTML = '<option value="">Reassign to…</option>' +
-          employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+'</option>').join('');
+        if (bulkSel) {
+          bulkSel.innerHTML = '<option value="">Reassign to…</option>' +
+            employees.map(e => '<option value="'+e.uid+'">'+esc(e.name)+'</option>').join('');
+        }
         const exportEmp = document.getElementById('export-employee-select');
-        exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
-          employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
+        if (exportEmp) {
+          exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
+            employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
+        }
         
         // Load shift history for admins
-        loadShiftHistoryPreview();
+        if (typeof loadShiftHistoryPreview === 'function') {
+          loadShiftHistoryPreview();
+        }
       } catch(err) { console.error('Admin init error:', err); }
     })();
   } else {
-    document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
-    document.getElementById('admin-portal-btn').classList.remove('hidden');
+    // Safe DOM updates with null checks
+    let el;
+    if ((el = document.getElementById('admin-portal-btn-label'))) el.textContent = 'Upload Leads';
+    if ((el = document.getElementById('admin-portal-btn'))) el.classList.remove('hidden');
     loadEmployeeTasks(user.uid);
     // Show shift modal if not on shift
     setTimeout(() => {
       if (localStorage.getItem('shiftActive') !== 'true') {
-        document.getElementById('shift-modal').style.display = 'flex';
+        let modal = document.getElementById('shift-modal');
+        if (modal) modal.style.display = 'flex';
       }
     }, 500);
   }
