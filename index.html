@@ -538,7 +538,7 @@ tr:hover td{background:var(--bg-secondary);}
 
 <script type="module">
 import { db, auth } from './firebase-init.js';
-import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, setDoc, serverTimestamp, where, writeBatch, orderBy, arrayUnion } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
+import { collection, query, onSnapshot, doc, updateDoc, deleteDoc, addDoc, getDoc, getDocs, setDoc, serverTimestamp, where, writeBatch, orderBy, arrayUnion, limit } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { onAuthStateChanged, signOut } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
 
 const STATUSES = ['Not Called','No Answer','Voicemail','Interested','Not Interested','Callback Scheduled','Wrong Number'];
@@ -1545,7 +1545,7 @@ onAuthStateChanged(auth, async (user) => {
     renderTable();
     if (userRole === 'admin') {
       renderPerfDashboard();
-      loadShiftHistoryPreview();
+      loadShiftHistoryPreview();  // Load shift history when data updates
     }
   }, err => {
     console.error(err);
