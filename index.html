@@ -319,27 +319,6 @@ tr:hover td{background:var(--bg-secondary);}
     <div class="perf-grid" id="perf-grid"></div>
   </div>
 
-  <!-- Admin Shift History (admin only) -->
-  <div id="admin-shift-history-panel" style="display:none;margin-bottom:20px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">🕐 Team Shift Activity</h2>
-      <button class="btn btn-icon" onclick="openAdminShifts()" style="font-size:12px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        View All Shifts
-      </button>
-    </div>
-    <div id="shift-history-preview" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;"></div>
-  </div>
-
-  <!-- Tasks Inbox (employee only) -->
-  <div id="tasks-inbox" style="margin-bottom:20px;">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">📬 Messages from Admin</h2>
-      <span id="tasks-unread-badge" style="display:none;background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;"></span>
-    </div>
-    <div id="tasks-list"><p style="font-size:13px;color:var(--text-hint);">No messages yet.</p></div>
-  </div>
-
   <!-- Support Banner (employee only) -->
   <div id="support-banner" style="margin-bottom:16px;border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;background:var(--bg);">
     <div style="display:flex;align-items:flex-start;gap:12px;">
@@ -1499,7 +1478,6 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('support-banner').style.display = 'none';
     document.getElementById('tasks-inbox').style.display = 'none';
     document.getElementById('perf-section').style.display = 'block';
-    document.getElementById('admin-shift-history-panel').style.display = 'block';
     document.getElementById('stat-calls-today-card').style.display = '';
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
@@ -1545,7 +1523,6 @@ onAuthStateChanged(auth, async (user) => {
     renderTable();
     if (userRole === 'admin') {
       renderPerfDashboard();
-      loadShiftHistoryPreview();  // Load shift history when data updates
     }
   }, err => {
     console.error(err);
