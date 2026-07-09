@@ -730,6 +730,13 @@ let employees = [];
 
 let userRole = null;
 
+// Helper to timeout async operations
+const withTimeout = (promise, ms = 10000) => 
+  Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('Operation timeout')), ms))
+  ]);
+
 onAuthStateChanged(auth, async (user) => {
   if (!user) {
     window.location.href = 'login.html';
@@ -755,9 +762,13 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('call-scripts-card').style.display = 'block';
     const delSection = document.getElementById('delete-employee-leads-section');
     if (delSection) delSection.classList.remove('hidden');
-    await loadEmployees();
-    await loadSentTasks();
-    await loadActivityFeed();
+    
+    // Load admin data with timeout protection
+    Promise.all([
+      withTimeout(loadEmployees()).catch(e => console.error('Employees load failed:', e)),
+      withTimeout(loadSentTasks()).catch(e => console.error('Tasks load failed:', e)),
+      withTimeout(loadActivityFeed()).catch(e => console.error('Activity load failed:', e))
+    ]).then(() => console.log('Admin data loaded')).catch(err => console.error('Admin load error:', err));
   } else {
     document.getElementById('employee-manager-card').classList.add('hidden');
     document.getElementById('clear-leads-btn').classList.add('hidden');
@@ -771,7 +782,7 @@ onAuthStateChanged(auth, async (user) => {
     if (delStatusFilter) delStatusFilter.classList.add('hidden');
   }
   
-  await showCurrentCount();
+  withTimeout(showCurrentCount()).catch(e => console.error('Count load failed:', e));
 });
 
 window.logout = async () => {

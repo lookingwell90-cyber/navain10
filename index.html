@@ -1511,7 +1511,24 @@ onAuthStateChanged(auth, async (user) => {
     ? query(collection(db, 'leads'))
     : query(collection(db, 'leads'), where('assignedTo', '==', user.uid));
 
+  let firstSnapshot = false;
+  let connectionTimeout = setTimeout(() => {
+    if (!firstSnapshot) {
+      console.warn('Firebase connection slow, forcing UI refresh...');
+      liveDot.classList.add('connected');
+      liveDot.innerHTML = '<span>Live</span>';
+      if (leads.length === 0) {
+        renderDashboard();
+        populateFilters();
+        renderPills();
+        renderTable();
+      }
+    }
+  }, 8000);
+
   onSnapshot(qLeads, snap => {
+    firstSnapshot = true;
+    clearTimeout(connectionTimeout);
     leads = snap.docs.map(d => ({id:d.id,...d.data()}));
     liveDot.classList.add('connected');
     liveDot.innerHTML = '<span>Live</span>';
@@ -1525,7 +1542,8 @@ onAuthStateChanged(auth, async (user) => {
       renderPerfDashboard();
     }
   }, err => {
-    console.error(err);
+    console.error('Firebase error:', err);
+    clearTimeout(connectionTimeout);
     liveDot.classList.remove('connected');
     liveDot.innerHTML = '<span>Offline</span>';
   });
