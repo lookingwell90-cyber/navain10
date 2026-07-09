@@ -2879,12 +2879,19 @@ window.updateShiftStatus = function() {
   const shiftStart = localStorage.getItem('shiftStart');
   const shiftBtn = document.getElementById('shift-toggle-btn');
   const shiftStatus = document.getElementById('shift-status');
+  const tableWrap = document.getElementById('table-wrap');
+  const pills = document.getElementById('pills').parentElement;
+  const controls = document.querySelector('.controls');
   
   if (!shiftBtn) return; // Button not ready yet
   
   if (userRole === 'admin') {
     shiftBtn.style.display = 'none';
     shiftStatus.style.display = 'none';
+    // Admins always see table
+    if (tableWrap) tableWrap.style.display = 'block';
+    if (pills) pills.style.display = 'block';
+    if (controls) controls.style.display = 'block';
     return;
   }
   
@@ -2905,11 +2912,27 @@ window.updateShiftStatus = function() {
     document.getElementById('shift-toggle-label').textContent = 'End Shift';
     shiftBtn.onclick = window.endShift;
     document.getElementById('dashboard-widgets').style.display = 'block';
+    
+    // SHOW LEADS WHEN SHIFT ACTIVE
+    if (tableWrap) tableWrap.style.display = 'block';
+    if (pills) pills.style.display = 'block';
+    if (controls) controls.style.display = 'block';
+    // Show stats
+    const statCards = document.querySelectorAll('.stat-card');
+    statCards.forEach(card => card.style.display = 'block');
   } else {
     shiftStatus.style.display = 'none';
     document.getElementById('shift-toggle-label').textContent = 'Start Shift';
     shiftBtn.onclick = window.toggleShiftModal;
     document.getElementById('dashboard-widgets').style.display = 'none';
+    
+    // HIDE LEADS WHEN NO SHIFT
+    if (tableWrap) tableWrap.style.display = 'none';
+    if (pills) pills.style.display = 'none';
+    if (controls) controls.style.display = 'none';
+    // Hide stats
+    const statCards = document.querySelectorAll('.stat-card');
+    statCards.forEach(card => card.style.display = 'none');
   }
 };
 
