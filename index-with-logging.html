@@ -1510,33 +1510,22 @@ onAuthStateChanged(auth, async (user) => {
     }, 500);
   }
 
-  console.log('🔧 Setting up leads query for', userRole, 'user:', user.uid);
-  
-  let qLeads;
-  try {
-    qLeads = userRole === 'admin'
-      ? query(collection(db, 'leads'))
-      : query(collection(db, 'leads'), where('assignedTo', '==', user.uid));
-    console.log('✅ Query created successfully');
-  } catch(err) {
-    console.error('❌ Query creation failed:', err);
-    liveDot.classList.remove('connected');
-    liveDot.innerHTML = '<span>Query Error</span>';
-    return;
-  }
+  const qLeads = userRole === 'admin'
+    ? query(collection(db, 'leads'))
+    : query(collection(db, 'leads'), where('assignedTo', '==', user.uid));
 
   let firstSnapshot = false;
   let connectionTimeout = setTimeout(() => {
     if (!firstSnapshot) {
       try {
-        console.warn('⏱️ Firebase connection slow (8s timeout), forcing UI refresh...');
+        console.warn('Firebase connection slow (8s timeout), forcing UI refresh...');
         liveDot.classList.add('connected');
         liveDot.innerHTML = '<span>Live</span>';
         // Try to render whatever data we have (might be empty)
-        if (typeof renderDashboard === 'function') { try { renderDashboard(); } catch(e) { console.error('renderDashboard error:', e); } }
-        if (typeof populateFilters === 'function') { try { populateFilters(); } catch(e) { console.error('populateFilters error:', e); } }
-        if (typeof renderPills === 'function') { try { renderPills(); } catch(e) { console.error('renderPills error:', e); } }
-        if (typeof renderTable === 'function') { try { renderTable(); } catch(e) { console.error('renderTable error:', e); } }
+        try { renderDashboard(); } catch(e) { console.error('renderDashboard error:', e); }
+        try { populateFilters(); } catch(e) { console.error('populateFilters error:', e); }
+        try { renderPills(); } catch(e) { console.error('renderPills error:', e); }
+        try { renderTable(); } catch(e) { console.error('renderTable error:', e); }
       } catch(e) {
         console.error('Timeout callback error:', e);
         liveDot.classList.add('connected');
@@ -1545,14 +1534,12 @@ onAuthStateChanged(auth, async (user) => {
     }
   }, 8000);
 
-  console.log('🔧 Setting up onSnapshot listener...');
-  
-  const unsubscribe = onSnapshot(qLeads, snap => {
+  onSnapshot(qLeads, snap => {
     firstSnapshot = true;
     clearTimeout(connectionTimeout);
     try {
       leads = snap.docs.map(d => ({id:d.id,...d.data()}));
-      console.log('✅ Leads snapshot received:', leads.length, 'leads');
+      console.log('Leads snapshot received:', leads.length, 'leads');
       liveDot.classList.add('connected');
       liveDot.innerHTML = '<span>Live</span>';
       updateStats();
@@ -1562,21 +1549,19 @@ onAuthStateChanged(auth, async (user) => {
       renderPills();
       renderTable();
       if (userRole === 'admin') {
-        try { renderPerfDashboard(); } catch(e) { console.error('renderPerfDashboard error:', e); }
+        renderPerfDashboard();
       }
     } catch(e) {
-      console.error('❌ onSnapshot callback error:', e);
+      console.error('onSnapshot callback error:', e);
       liveDot.classList.add('connected');
       liveDot.innerHTML = '<span>Live</span>';
     }
   }, err => {
-    console.error('❌ Firebase listener error:', err);
+    console.error('Firebase listener error:', err);
     clearTimeout(connectionTimeout);
     liveDot.classList.remove('connected');
     liveDot.innerHTML = '<span>Offline</span>';
   });
-  
-  console.log('✅ onSnapshot listener attached:', typeof unsubscribe);
 });
 
 window.logout = async () => {
