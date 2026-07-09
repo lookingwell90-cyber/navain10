@@ -3205,6 +3205,13 @@ window.loadShiftHistoryPreview = async function() {
 window.refreshShiftHistory = function() {
   loadAdminShiftHistory();
 };
+
+// Update shift status display every 10 seconds for live time counter
+setInterval(() => {
+  if (userRole !== 'admin' && localStorage.getItem('shiftActive') === 'true') {
+    updateShiftStatus();
+  }
+}, 10000);
 </script>
 
 <!-- ── Footer ── -->
