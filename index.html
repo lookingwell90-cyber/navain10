@@ -228,6 +228,12 @@ tr:hover td{background:var(--bg-secondary);}
 /* Task inbox */
 .badge{display:inline-block;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;}
 .hidden{display:none!important;}
+.widget-card{transition:var(--transition);}
+.widget-card:hover{box-shadow:var(--shadow-lg);transform:translateY(-2px);border-color:var(--border-strong);}
+.widget-card.dragging{opacity:0.5;}
+#widgets-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;}
+#shift-modal{display:flex;}
+#dashboard-customizer{display:flex;}
 @media(max-width:768px){
   main{padding:16px 12px 80px;}
   .stats-grid{grid-template-columns:1fr 1fr;}
@@ -236,10 +242,12 @@ tr:hover td{background:var(--bg-secondary);}
   .controls{gap:8px;}
   .controls select{font-size:12px;padding:8px 10px;}
   .perf-grid{grid-template-columns:1fr;}
+  #widgets-grid{grid-template-columns:1fr;}
 }
 @media(max-width:480px){
   .stats-grid{grid-template-columns:1fr;}
   .header-actions .btn-label{display:none;}
+  #widgets-grid{grid-template-columns:1fr;}
 }
 </style>
 </head>
@@ -249,6 +257,11 @@ tr:hover td{background:var(--bg-secondary);}
     <div class="logo">Partechnologys — Lead Tracker <span class="live-dot" id="live-dot"><span>Connecting…</span></span></div>
   </div>
   <div class="header-actions">
+    <span id="shift-status" style="display:none;font-size:12px;font-weight:600;background:#dcfce7;color:#166534;padding:4px 10px;border-radius:var(--radius);margin-right:8px;"></span>
+    <button class="btn" id="shift-toggle-btn" style="display:none;" onclick="toggleShiftModal()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <span class="btn-label" id="shift-toggle-label">Start Shift</span>
+    </button>
     <span id="user-display" style="font-size:13px;font-weight:600;color:var(--text-muted);margin-right:4px;"></span>
     <button class="btn btn-secondary-action" onclick="openAddLeadModal()">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -298,33 +311,24 @@ tr:hover td{background:var(--bg-secondary);}
     </div>
   </div>
 
-  <!-- Start/End Shift Section -->
-  <div id="shift-section" style="margin-bottom:20px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);box-shadow:var(--shadow-md);">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-      <button id="start-shift-btn" class="btn btn-accent" onclick="toggleStartShift()" style="font-size:14px;padding:10px 18px;">
-        ▶ Start Shift
-      </button>
-      <span id="shift-status" style="font-size:13px;font-weight:600;color:var(--text-muted);"></span>
-    </div>
-  </div>
-
-  <!-- Customizable Dashboard Widgets -->
-  <div id="dashboard-section" style="margin-bottom:20px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">📊 Dashboard Widgets</h2>
-      <button id="customize-dashboard-btn" class="btn btn-secondary-action" onclick="toggleDashboardCustomize()" style="font-size:12px;">
-        ⚙ Customize
-      </button>
-    </div>
-    <div id="widgets-container" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;"></div>
-  </div>
-
   <!-- Agent Performance (admin only) -->
   <div id="perf-section" style="display:none;margin-bottom:20px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
       <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">📊 Agent Performance</h2>
     </div>
     <div class="perf-grid" id="perf-grid"></div>
+  </div>
+
+  <!-- Admin Shift History (admin only) -->
+  <div id="admin-shift-history-panel" style="display:none;margin-bottom:20px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">🕐 Team Shift Activity</h2>
+      <button class="btn btn-icon" onclick="openAdminShifts()" style="font-size:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        View All Shifts
+      </button>
+    </div>
+    <div id="shift-history-preview" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;"></div>
   </div>
 
   <!-- Tasks Inbox (employee only) -->
@@ -351,6 +355,29 @@ tr:hover td{background:var(--bg-secondary);}
         </div>
       </div>
     </div>
+  </div>
+
+  <!-- Agent Lead Range Card (non-admin only) -->
+  <div id="agent-lead-range-card" style="display:none;background:var(--accent-bg);border:1px solid rgba(37,99,235,0.3);border-radius:var(--radius-lg);padding:14px 16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;">My Assigned Leads</div>
+        <div style="font-size:16px;font-weight:700;color:var(--accent-text);" id="agent-lead-range">Lead #1 — #50 (50 total)</div>
+      </div>
+      <div style="text-align:right;font-size:13px;color:var(--text-muted);">Your personal numbering</div>
+    </div>
+  </div>
+
+  <!-- Dashboard Widgets Area -->
+  <div id="dashboard-widgets" style="display:none;margin-bottom:20px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h2 style="font-size:15px;font-weight:700;font-family:'Outfit',sans-serif;">📊 My Dashboard</h2>
+      <button class="btn btn-icon" onclick="openDashboardCustomizer()" style="font-size:12px;">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+        Customize
+      </button>
+    </div>
+    <div id="widgets-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;"></div>
   </div>
 
   <!-- Pills -->
@@ -424,7 +451,7 @@ tr:hover td{background:var(--bg-secondary);}
       <thead>
         <tr>
           <th><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)" title="Select all"></th>
-          <th>#</th><th>Personal #</th><th>Business</th><th>Link</th><th>Contact</th><th>Phone</th>
+          <th>#</th><th>Business</th><th>Link</th><th>Contact</th><th>Phone</th>
           <th>City</th><th>Province</th><th>Local Time</th><th>Niche</th><th>Status</th>
           <th>Callback Date</th><th>Note</th><th>Assigned</th><th>Updated</th><th></th>
         </tr>
@@ -1472,6 +1499,7 @@ onAuthStateChanged(auth, async (user) => {
     document.getElementById('support-banner').style.display = 'none';
     document.getElementById('tasks-inbox').style.display = 'none';
     document.getElementById('perf-section').style.display = 'block';
+    document.getElementById('admin-shift-history-panel').style.display = 'block';
     document.getElementById('stat-calls-today-card').style.display = '';
     try {
       const usersSnap = await getDocs(collection(db, 'users'));
@@ -1485,11 +1513,20 @@ onAuthStateChanged(auth, async (user) => {
       const exportEmp = document.getElementById('export-employee-select');
       exportEmp.innerHTML = '<option value="">Export: All Leads</option><option value="unassigned">Export: Unassigned</option>' +
         employees.map(e => '<option value="'+e.uid+'">Export: '+esc(e.name)+' ('+(e.role==='admin'?'Admin':'Employee')+')</option>').join('');
+      
+      // Load shift history for admins
+      loadShiftHistoryPreview();
     } catch(err) { console.error(err); }
   } else {
     document.getElementById('admin-portal-btn-label').textContent = 'Upload Leads';
     document.getElementById('admin-portal-btn').classList.remove('hidden');
     loadEmployeeTasks(user.uid);
+    // Show shift modal if not on shift
+    setTimeout(() => {
+      if (localStorage.getItem('shiftActive') !== 'true') {
+        document.getElementById('shift-modal').style.display = 'flex';
+      }
+    }, 500);
   }
 
   const qLeads = userRole === 'admin'
@@ -1501,10 +1538,15 @@ onAuthStateChanged(auth, async (user) => {
     liveDot.classList.add('connected');
     liveDot.innerHTML = '<span>Live</span>';
     updateStats();
+    updateShiftStatus();
+    renderDashboard();
     populateFilters();
     renderPills();
     renderTable();
-    if (userRole === 'admin') renderPerfDashboard();
+    if (userRole === 'admin') {
+      renderPerfDashboard();
+      loadShiftHistoryPreview();
+    }
   }, err => {
     console.error(err);
     liveDot.classList.remove('connected');
@@ -1539,6 +1581,19 @@ function updateStats() {
   } else {
     document.getElementById('stat-overdue-label').textContent = 'Requires follow-up';
   }
+  // Agent lead range (for non-admin agents)
+  if (userRole !== 'admin' && currentUser) {
+    const myLeads = leads.filter(l => l.assignedTo === currentUser.uid);
+    const myCount = myLeads.length;
+    const rangeCard = document.getElementById('agent-lead-range-card');
+    if (myCount > 0) {
+      document.getElementById('agent-lead-range').textContent = 'Lead #1 — #' + myCount + ' (' + myCount + ' total)';
+      rangeCard.style.display = 'block';
+    } else {
+      rangeCard.style.display = 'none';
+    }
+  }
+  
   // Calls today (from call logs stored per lead)
   if (userRole === 'admin') {
     const todayStr = new Date().toISOString().slice(0,10);
@@ -1678,13 +1733,13 @@ window.renderTable = function() {
 
   const tbody = document.getElementById('tbody');
   if (!filtered.length) {
-    tbody.innerHTML = '<tr><td colspan="17" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:30px;color:var(--text-hint);">No leads match filters.</td></tr>';
     mobileList.innerHTML = '<div style="text-align:center;padding:30px;color:var(--text-hint);font-size:13px;">No leads match filters.</div>';
     return;
   }
 
   tbody.innerHTML = filtered.map((lead, fi) => {
-    const idx = leads.indexOf(lead);
+    const idx = fi;
     const col = STATUS_COLORS[lead._status] || STATUS_COLORS['Not Called'];
     const phone = f(lead,'phone');
     const email = f(lead,'email');
@@ -1712,11 +1767,9 @@ window.renderTable = function() {
       assignCell = '<td style="font-size:12px;color:var(--text-muted);">'+esc(lead.assignedName||'—')+'</td>';
     }
 
-    const personelLeadNum = getLeadNumber(lead);
     return '<tr class="'+(isAdminAssigned?'admin-assigned-row':'')+'" style="'+(isSelected?'background:var(--accent-bg);':'')+'">' +
       '<td><input type="checkbox" class="lead-cb" data-id="'+lead.id+'" onchange="toggleLeadSelect(this)" '+(isSelected?'checked':'')+' '+(userRole!=='admin'?'style="display:none"':'')+'/></td>' +
       '<td style="color:var(--text-hint);font-size:12px;">'+(idx+1)+'</td>' +
-      '<td style="color:var(--accent);font-weight:600;font-size:12px;">'+personelLeadNum+'</td>' +
       '<td style="font-weight:600;max-width:170px;white-space:normal;" title="'+esc(bName)+'"><button class="btn-icon" onclick="openDetailModal(\''+lead.id+'\')" title="View details" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:170px;">'+esc(bName)+'</button>'+adminBadge+
         '<div style="margin-top:4px;display:flex;flex-wrap:wrap;align-items:center;gap:2px;">'+renderTagChips(lead._tags, '')+'<button class="tag-add-btn" data-id="'+lead.id+'" onclick="openTagPicker(event,this)" title="Add tag">+</button></div>' +
       '</td>' +
@@ -1779,14 +1832,12 @@ window.renderTable = function() {
 // ── Status update
 window.updateStatus = async function(sel) {
   const id = sel.dataset.id;
-  const lead = leads.find(l => l.id === id);
   const col = STATUS_COLORS[sel.value];
   sel.style.background = col.bg; sel.style.color = col.text;
   const updates = {_status: sel.value, _updatedAt: serverTimestamp()};
   if (sel.value !== 'Callback Scheduled') { updates._callbackDate = ''; updates._callbackTime = ''; }
   try {
     await updateDoc(doc(db,'leads',id), updates);
-    if (lead) updateShiftMetrics(lead, sel.value);
     showToast(sel.value === 'Callback Scheduled' ? 'Status updated — set the callback date →' : 'Status updated');
   }
   catch(e) { showToast('Failed to save'); }
@@ -2085,6 +2136,14 @@ window.openDetailModal = async function(id) {
   detailLeadId = id;
   const lead = leads.find(l => l.id === id);
   if (!lead) return;
+  
+  // Calculate personal lead number for agent
+  if (userRole !== 'admin' && currentUser) {
+    const myLeads = leads.filter(l => l.assignedTo === currentUser.uid);
+    const personalIndex = myLeads.findIndex(l => l.id === id) + 1;
+    lead._personalLeadNum = personalIndex > 0 ? personalIndex : null;
+  }
+  
   document.getElementById('detail-title').textContent = f(lead,'businessName') || 'Lead Details';
   const modal = document.getElementById('detail-modal');
   modal.classList.add('show');
@@ -2124,6 +2183,7 @@ function renderDetailBody(lead) {
     <div class="detail-section">
       <div class="detail-section-title">Contact Information</div>
       <div class="detail-grid">
+        ${lead._personalLeadNum ? '<div class="detail-field"><span class="detail-label">Your Lead #</span><span class="detail-value" style="font-weight:700;color:var(--accent);">Lead #' + lead._personalLeadNum + '</span></div>' : ''}
         <div class="detail-field"><span class="detail-label">Business</span><span class="detail-value">${esc(f(lead,'businessName')||'—')}</span></div>
         <div class="detail-field"><span class="detail-label">Contact</span><span class="detail-value">${esc(f(lead,'contactName')||'—')}</span></div>
         <div class="detail-field"><span class="detail-label">Phone</span><span class="detail-value"><a href="tel:${esc(phone)}">${esc(phone||'—')}</a></span></div>
@@ -2693,363 +2753,416 @@ window.markTaskRead = async function(taskId) {
   } catch(e){console.error(e);}
 };
 
-// ── SHIFT MANAGEMENT (Personal Lead Numbering & Shift Tracking)
-let currentShift = null;
-let shiftStartTime = null;
-let leadCounter = {};
-
-// Load shift data on startup
-async function loadShiftData() {
-  if (!currentUser) return;
-  try {
-    const shiftDoc = await getDoc(doc(db, 'shifts', currentUser.uid));
-    if (shiftDoc.exists()) {
-      const data = shiftDoc.data();
-      if (data.isActive) {
-        currentShift = data;
-        shiftStartTime = data.startTime && typeof data.startTime.toDate === 'function' 
-  ? data.startTime.toDate() 
-  : new Date(data.startTime);  // Proper Date - CORRECT
-        updateShiftUI();
-      }
-    }
-    // Load lead counter
-    const counterDoc = await getDoc(doc(db, 'leadCounters', currentUser.uid));
-    if (counterDoc.exists()) {
-      leadCounter = counterDoc.data();
-    } else {
-      leadCounter = { count: 0 };
-    }
-  } catch(e) { console.error('Error loading shift data:', e); }
-}
-
-// Start/End Shift Toggle
-window.toggleStartShift = async function() {
-  if (!currentUser) return;
-  try {
-    if (currentShift && currentShift.isActive) {
-      // End Shift
-      const endTime = new Date();
-      const shiftDoc = { ...currentShift, endTime, isActive: false };
-      await setDoc(doc(db, 'shifts', currentUser.uid), shiftDoc);
-      
-      // Create shift summary
-      await generateShiftSummary(currentShift, shiftDoc);
-      
-      currentShift = null;
-      shiftStartTime = null;
-      updateShiftUI();
-      showToast('✓ Shift ended');
-    } else {
-      // Start Shift
-      const startTime = new Date();
-      currentShift = {
-        userId: currentUser.uid,
-        userName: localStorage.getItem('user_name'),
-        startTime,
-        isActive: true,
-        calls: 0,
-        contacts: 0,
-        interested: 0,
-        demos: 0
-      };
-      shiftStartTime = startTime;
-      leadCounter.count = 0;
-      await setDoc(doc(db, 'shifts', currentUser.uid), currentShift);
-      await setDoc(doc(db, 'leadCounters', currentUser.uid), leadCounter);
-      updateShiftUI();
-      showToast('✓ Shift started');
-    }
-  } catch(e) {
-    showToast('Error: ' + e.message);
-    console.error(e);
-  }
-};
-
-function updateShiftUI() {
-  const btn = document.getElementById('start-shift-btn');
-  const status = document.getElementById('shift-status');
-  
-  if (currentShift && currentShift.isActive) {
-    btn.textContent = '⏹ End Shift';
-    btn.style.background = 'var(--danger-bg)';
-    btn.style.color = 'var(--danger-text)';
-    btn.style.borderColor = 'transparent';
-    const startDate = shiftStartTime instanceof Date ? shiftStartTime : new Date(shiftStartTime);
-    const elapsed = Math.floor((new Date() - startDate) / 60000);
-// Now handles both Date and Timestamp safely
-    const hours = Math.floor(elapsed / 60);
-    const mins = elapsed % 60;
-    status.textContent = `Active • ${hours}h ${mins}m`;
-  } else {
-    btn.textContent = '▶ Start Shift';
-    btn.style.background = 'var(--accent)';
-    btn.style.color = '#fff';
-    btn.style.borderColor = 'var(--accent)';
-    status.textContent = 'No active shift';
-  }
-}
-
-// Update shift counter on lead status change
-async function updateShiftMetrics(lead, newStatus) {
-  if (!currentShift || !currentShift.isActive) return;
-  try {
-    const oldStatus = lead._status;
-    const updates = {};
-    
-    if (!oldStatus && newStatus !== 'Not Called') updates.calls = (currentShift.calls || 0) + 1;
-    if (newStatus === 'Interested') {
-      updates.interested = (currentShift.interested || 0) + 1;
-      updates.contacts = (currentShift.contacts || 0) + 1;
-    }
-    if (newStatus === 'Callback Scheduled') {
-      updates.demos = (currentShift.demos || 0) + 1;
-    }
-    
-    if (Object.keys(updates).length > 0) {
-      currentShift = { ...currentShift, ...updates };
-      await updateDoc(doc(db, 'shifts', currentUser.uid), updates);
-    }
-  } catch(e) { console.error('Error updating shift metrics:', e); }
-}
-
-// Assign Personal Lead Numbers (Hafsa #1-50, Usaid #1-50)
-function getLeadNumber(lead) {
-  if (lead._leadNumber) return lead._leadNumber;
-  
-  const agent = lead.assignedTo ? employees.find(e => e.uid === lead.assignedTo)?.name : 'Unassigned';
-  if (!agent) return '—';
-  
-  const agentLeads = leads.filter(l => l.assignedTo === lead.assignedTo && !l._adminAssigned);
-  const index = agentLeads.indexOf(lead) + 1;
-  return index <= 50 ? `${agent} #${index}` : '—';
-}
-
-// Generate Shift Summary Report
-async function generateShiftSummary(startShift, endShift) {
-  try {
-    const summary = {
-      userId: currentUser.uid,
-      userName: localStorage.getItem('user_name'),
-      date: new Date().toISOString().slice(0, 10),
-      startTime: startShift.startTime,
-      endTime: endShift.endTime,
-      const startTime = startShift.startTime && typeof startShift.startTime.toDate === 'function' 
-  ? startShift.startTime.toDate() 
-  : new Date(startShift.startTime);
-const endTime = endShift.endTime && typeof endShift.endTime.toDate === 'function' 
-  ? endShift.endTime.toDate() 
-  : new Date(endShift.endTime);
-
-const durationMinutes = Math.round((endTime - startTime) / 60000);
-// Now properly calculates duration
-      calls: endShift.calls || 0,
-      contacts: endShift.contacts || 0,
-      interested: endShift.interested || 0,
-      demos: endShift.demos || 0
-    };
-    
-    await addDoc(collection(db, 'shiftSummaries'), summary);
-    showShiftSummaryModal(summary);
-  } catch(e) { console.error('Error generating shift summary:', e); }
-}
-
-function showShiftSummaryModal(summary) {
-  const html = `
-    <div class="modal-overlay" onclick="if(event.target===this)this.remove()">
-      <div class="modal-content" style="max-width:420px;">
-        <div class="modal-header">
-          <h2>Shift Summary</h2>
-          <button class="modal-close" onclick="this.closest('.modal-overlay').remove()">&times;</button>
-        </div>
-        <div style="padding:20px;">
-          <div style="display:grid;gap:12px;">
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
-              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Duration</span>
-              <span style="font-size:16px;font-weight:700;color:var(--text);">${Math.floor(summary.duration/60)}h ${summary.duration%60}m</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
-              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Calls Made</span>
-              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.calls}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
-              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Contacts Made</span>
-              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.contacts}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
-              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Interested Leads</span>
-              <span style="font-size:16px;font-weight:700;color:var(--s-interested-text);">${summary.interested}</span>
-            </div>
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px;background:var(--bg-secondary);border-radius:var(--radius);">
-              <span style="font-size:13px;color:var(--text-muted);font-weight:600;">Demos Booked</span>
-              <span style="font-size:16px;font-weight:700;color:var(--accent);">${summary.demos}</span>
-            </div>
-          </div>
-          <div class="modal-footer" style="margin-top:20px;">
-            <button class="btn btn-accent" onclick="this.closest('.modal-overlay').remove()">Done</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-  document.body.insertAdjacentHTML('beforeend', html);
-}
-
-// ── CUSTOMIZABLE DASHBOARD WIDGETS
-const DEFAULT_WIDGETS = [
-  { id: 'total-leads', name: 'Total Leads', enabled: true },
-  { id: 'call-rate', name: 'Call Rate %', enabled: true },
-  { id: 'interested', name: 'Interested', enabled: true },
-  { id: 'callbacks', name: 'Callbacks', enabled: true },
-  { id: 'shift-status', name: 'Shift Status', enabled: true }
-];
-
-let dashboardWidgets = [...DEFAULT_WIDGETS];
-
-function loadDashboardPrefs() {
-  const saved = localStorage.getItem('dashboardWidgets');
-  if (saved) {
-    try {
-      dashboardWidgets = JSON.parse(saved);
-    } catch(e) {
-      dashboardWidgets = [...DEFAULT_WIDGETS];
-    }
-  }
-  renderWidgets();
-}
-
-function renderWidgets() {
-  const container = document.getElementById('widgets-container');
-  container.innerHTML = '';
-  
-  dashboardWidgets.filter(w => w.enabled).forEach((widget, idx) => {
-    let content = '';
-    let stat = '';
-    
-    if (widget.id === 'total-leads') {
-      const total = leads.length;
-      stat = total.toString();
-      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}</div>`;
-    } else if (widget.id === 'call-rate') {
-      const total = leads.length;
-      const called = leads.filter(l => l._status && l._status !== 'Not Called').length;
-      stat = total > 0 ? Math.round((called/total)*100) : 0;
-      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}%</div>`;
-    } else if (widget.id === 'interested') {
-      stat = leads.filter(l => l._status === 'Interested').length;
-      content = `<div style="font-size:28px;font-weight:700;color:var(--s-interested-text);">${stat}</div>`;
-    } else if (widget.id === 'callbacks') {
-      stat = leads.filter(l => l._status === 'Callback Scheduled').length;
-      content = `<div style="font-size:28px;font-weight:700;color:var(--accent);">${stat}</div>`;
-    } else if (widget.id === 'shift-status') {
-      const isActive = currentShift && currentShift.isActive;
-      content = `<div style="font-size:14px;color:var(--text-muted);">${isActive ? '🟢 Active' : '⚫ Offline'}</div>`;
-    }
-    
-    const widget_el = document.createElement('div');
-    widget_el.draggable = true;
-    widget_el.id = 'widget-' + widget.id;
-    widget_el.style.cssText = `
-      background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);
-      padding:20px;box-shadow:var(--shadow-md);cursor:grab;transition:var(--transition);
-    `;
-    widget_el.innerHTML = `
-      <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;margin-bottom:12px;">${widget.name}</div>
-      ${content}
-    `;
-    widget_el.addEventListener('dragstart', handleDragStart);
-    widget_el.addEventListener('dragover', handleDragOver);
-    widget_el.addEventListener('drop', handleDrop);
-    widget_el.addEventListener('dragend', handleDragEnd);
-    container.appendChild(widget_el);
-  });
-}
-
-let draggedElement = null;
-function handleDragStart(e) {
-  draggedElement = this;
-  this.style.opacity = '0.5';
-  e.dataTransfer.effectAllowed = 'move';
-}
-function handleDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  if (this !== draggedElement) {
-    this.style.transform = 'scale(1.02)';
-  }
-}
-function handleDrop(e) {
-  e.preventDefault();
-  if (this !== draggedElement) {
-    const container = document.getElementById('widgets-container');
-    const allWidgets = Array.from(container.children);
-    const draggedIdx = allWidgets.indexOf(draggedElement);
-    const thisIdx = allWidgets.indexOf(this);
-    
-    if (draggedIdx < thisIdx) {
-      this.parentNode.insertBefore(draggedElement, this.nextSibling);
-    } else {
-      this.parentNode.insertBefore(draggedElement, this);
-    }
-    saveDashboardOrder();
-  }
-}
-function handleDragEnd(e) {
-  this.style.opacity = '1';
-  this.style.transform = 'scale(1)';
-  Array.from(document.getElementById('widgets-container').children).forEach(el => {
-    el.style.transform = 'scale(1)';
-  });
-}
-
-function saveDashboardOrder() {
-  const container = document.getElementById('widgets-container');
-  const order = Array.from(container.children).map(el => {
-    const id = el.id.replace('widget-', '');
-    return dashboardWidgets.find(w => w.id === id);
-  });
-  dashboardWidgets = order;
-  localStorage.setItem('dashboardWidgets', JSON.stringify(dashboardWidgets));
-}
-
-window.toggleDashboardCustomize = function() {
-  const container = document.getElementById('widgets-container');
-  const btn = document.getElementById('customize-dashboard-btn');
-  const isCustomizing = container.style.opacity === '0.6';
-  
-  if (isCustomizing) {
-    container.style.opacity = '1';
-    container.style.pointerEvents = 'auto';
-    btn.textContent = '⚙ Customize';
-  } else {
-    container.style.opacity = '0.6';
-    container.style.pointerEvents = 'auto';
-    btn.textContent = '✓ Done';
-  }
-};
-
-// Update shift every second
-setInterval(() => {
-  if (currentShift && currentShift.isActive) {
-    updateShiftUI();
-  }
-}, 1000);
-
-// Load dashboard prefs and shift data on auth
-const origAuthCallback = onAuthStateChanged.toString();
-onAuthStateChanged(auth, async (user) => {
-  if (user) {
-    setTimeout(() => {
-      loadDashboardPrefs();
-      loadShiftData();
-    }, 500);
-  }
-});
-
 window.exportCSV = window.exportCSV;
 window.renderTable = window.renderTable;
 window.updateStatus = window.updateStatus;
 window.updateNote = window.updateNote;
+
+// ── Shift Management
+const DASHBOARD_WIDGETS = [
+  {id:'top-leads', name:'Top 5 Leads', icon:'👥', enabled:true},
+  {id:'calls-today', name:'Calls Today', icon:'📞', enabled:true},
+  {id:'conversion-rate', name:'Conversion Rate', icon:'📊', enabled:true},
+  {id:'callbacks-due', name:'Callbacks Due', icon:'🔔', enabled:true},
+  {id:'lead-queue', name:'Lead Queue (Next 5)', icon:'📋', enabled:true}
+];
+
+window.toggleShiftModal = function() {
+  const modal = document.getElementById('shift-modal');
+  modal.style.display = modal.style.display==='none'?'flex':'none';
+};
+
+window.closeShiftModal = function() {
+  document.getElementById('shift-modal').style.display = 'none';
+};
+
+window.startShift = async function() {
+  const shiftStart = new Date().toISOString();
+  localStorage.setItem('shiftStart', shiftStart);
+  localStorage.setItem('shiftActive', 'true');
+  
+  // Save to Firestore
+  if (currentUser) {
+    try {
+      await addDoc(collection(db, 'shifts'), {
+        userId: currentUser.uid,
+        userName: localStorage.getItem('user_name') || 'Unknown',
+        startTime: shiftStart,
+        endTime: null,
+        status: 'active',
+        callsCount: 0,
+        contactsCount: 0,
+        interestedCount: 0,
+        demosCount: 0,
+        createdAt: new Date().toISOString()
+      });
+    } catch (e) { console.error('Error saving shift start:', e); }
+  }
+  
+  closeShiftModal();
+  updateShiftStatus();
+  renderDashboard();
+  showToast('✓ Shift started', 'success');
+};
+
+window.endShift = async function() {
+  if(!confirm('End your shift? You can start a new one later.')) return;
+  
+  const shiftStart = localStorage.getItem('shiftStart');
+  const shiftEnd = new Date().toISOString();
+  
+  // Calculate shift metrics
+  const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid);
+  const todayStr = new Date().toISOString().slice(0,10);
+  
+  let callsCount = 0;
+  let contactsCount = 0;
+  let interestedCount = 0;
+  let demosCount = 0;
+  
+  myLeads.forEach(l => {
+    // Count calls made during shift
+    if (l._callLog && Array.isArray(l._callLog)) {
+      l._callLog.forEach(log => {
+        if (log.ts && log.ts.slice(0,10) === todayStr) {
+          callsCount++;
+          if (log.outcome && (log.outcome === 'Interested' || log.outcome === 'Callback Scheduled')) {
+            contactsCount++;
+          }
+        }
+      });
+    }
+    // Count interested and demos scheduled
+    if (l._status === 'Interested') interestedCount++;
+    if (l._status === 'Callback Scheduled') demosCount++;
+  });
+  
+  const shiftSummary = {
+    userId: currentUser?.uid,
+    userName: localStorage.getItem('user_name') || 'Unknown',
+    startTime: shiftStart,
+    endTime: shiftEnd,
+    duration: Math.floor((new Date(shiftEnd) - new Date(shiftStart)) / 60000),
+    callsCount,
+    contactsCount,
+    interestedCount,
+    demosCount,
+    totalLeadsAssigned: myLeads.length,
+    status: 'completed',
+    createdAt: new Date().toISOString()
+  };
+  
+  // Save shift summary to Firestore
+  if (currentUser) {
+    try {
+      await addDoc(collection(db, 'shiftSummaries'), shiftSummary);
+    } catch (e) { console.error('Error saving shift summary:', e); }
+  }
+  
+  localStorage.removeItem('shiftActive');
+  localStorage.removeItem('shiftStart');
+  
+  updateShiftStatus();
+  document.getElementById('dashboard-widgets').style.display = 'none';
+  
+  // Show shift summary modal
+  showShiftSummary(shiftSummary);
+};
+
+window.updateShiftStatus = function() {
+  const isActive = localStorage.getItem('shiftActive') === 'true';
+  const shiftStart = localStorage.getItem('shiftStart');
+  const shiftBtn = document.getElementById('shift-toggle-btn');
+  const shiftStatus = document.getElementById('shift-status');
+  const mainContent = document.querySelector('main > :not(header)');
+  
+  if (userRole === 'admin') {
+    shiftBtn.style.display = 'none';
+    shiftStatus.style.display = 'none';
+    return;
+  }
+  
+  shiftBtn.style.display = 'inline-flex';
+  
+  if (isActive && shiftStart) {
+    const elapsed = Math.floor((new Date() - new Date(shiftStart)) / 60000);
+    const hours = Math.floor(elapsed / 60);
+    const mins = elapsed % 60;
+    
+    let timeStr = '';
+    if (hours > 0) timeStr = hours + 'h ' + mins + 'm';
+    else timeStr = mins + 'm';
+    
+    shiftStatus.textContent = '🕐 Shift Active: ' + timeStr;
+    shiftStatus.style.display = 'inline-block';
+    document.getElementById('shift-toggle-label').textContent = 'End Shift';
+    shiftBtn.onclick = window.endShift;
+    document.getElementById('dashboard-widgets').style.display = 'block';
+  } else {
+    shiftStatus.style.display = 'none';
+    document.getElementById('shift-toggle-label').textContent = 'Start Shift';
+    shiftBtn.onclick = window.toggleShiftModal;
+    document.getElementById('dashboard-widgets').style.display = 'none';
+  }
+};
+
+// ── Dashboard Customization
+window.renderDashboard = function() {
+  if (userRole === 'admin') return;
+  
+  const grid = document.getElementById('widgets-grid');
+  if (!grid) return;
+  
+  const savedLayout = JSON.parse(localStorage.getItem('dashboardLayout') || JSON.stringify(DASHBOARD_WIDGETS));
+  
+  grid.innerHTML = savedLayout
+    .filter(w => w.enabled)
+    .map(w => {
+      let content = '';
+      
+      if (w.id === 'top-leads') {
+        const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid).slice(0, 5);
+        content = '<div style="font-size:12px;color:var(--text-muted);">' + 
+          (myLeads.length > 0 
+            ? myLeads.map((l,i) => '<div style="padding:4px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">#{' + (i+1) + '} ' + esc(f(l,'businessName')||'—') + '</div>').join('')
+            : 'No leads assigned') +
+          '</div>';
+      } else if (w.id === 'calls-today') {
+        const todayStr = new Date().toISOString().slice(0,10);
+        const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid);
+        let callCount = 0;
+        myLeads.forEach(l => {
+          if (l._callLog && Array.isArray(l._callLog)) {
+            callCount += l._callLog.filter(e => e.ts && e.ts.slice(0,10) === todayStr).length;
+          }
+        });
+        content = '<div style="font-size:28px;font-weight:700;color:var(--accent);">' + callCount + '</div><div style="font-size:11px;color:var(--text-muted);">calls logged</div>';
+      } else if (w.id === 'conversion-rate') {
+        const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid);
+        const interested = myLeads.filter(l => l._status === 'Interested').length;
+        const rate = myLeads.length > 0 ? Math.round((interested / myLeads.length) * 100) : 0;
+        content = '<div style="font-size:28px;font-weight:700;color:#16a34a;">' + rate + '%</div><div style="font-size:11px;color:var(--text-muted);">conversion rate</div>';
+      } else if (w.id === 'callbacks-due') {
+        const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid);
+        const overdue = myLeads.filter(l => callbackStatus(l) === 'overdue').length;
+        const today = myLeads.filter(l => callbackStatus(l) === 'today').length;
+        content = '<div style="font-size:14px;color:var(--text);"><strong>' + overdue + '</strong> overdue · <strong>' + today + '</strong> today</div>';
+      } else if (w.id === 'lead-queue') {
+        const myLeads = leads.filter(l => l.assignedTo === currentUser?.uid).slice(0, 5);
+        content = '<div style="font-size:12px;color:var(--text-muted);">' + 
+          (myLeads.length > 0 
+            ? myLeads.map((l,i) => '<div style="padding:4px 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;" onclick="openDetailModal(\'' + l.id + '\')">#' + (i+1) + ' ' + esc(f(l,'businessName')||'—') + '</div>').join('')
+            : 'No leads in queue') +
+          '</div>';
+      }
+      
+      return '<div class="widget-card" style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px;box-shadow:var(--shadow-sm);cursor:move;" draggable="true" data-widget="' + w.id + '"><div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px;">' + w.icon + ' ' + w.name + '</div>' + content + '</div>';
+    }).join('');
+  
+  setupDragDrop();
+};
+
+window.openDashboardCustomizer = function() {
+  const modal = document.getElementById('dashboard-customizer');
+  const savedLayout = JSON.parse(localStorage.getItem('dashboardLayout') || JSON.stringify(DASHBOARD_WIDGETS));
+  
+  const listHtml = savedLayout.map((w, idx) => 
+    '<div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius);cursor:move;" draggable="true" data-idx="' + idx + '">' +
+      '<input type="checkbox" ' + (w.enabled ? 'checked' : '') + ' onchange="toggleWidget(this)" data-id="' + w.id + '" style="cursor:pointer;width:18px;height:18px;">' +
+      '<span style="flex:1;font-size:13px;color:var(--text);font-weight:500;">' + w.icon + ' ' + w.name + '</span>' +
+      '<span style="color:var(--text-hint);font-size:12px;">⋮⋮</span>' +
+    '</div>'
+  ).join('');
+  
+  document.getElementById('widget-list').innerHTML = listHtml;
+  modal.style.display = 'flex';
+};
+
+window.closeDashboardCustomizer = function() {
+  document.getElementById('dashboard-customizer').style.display = 'none';
+};
+
+window.toggleWidget = function(checkbox) {
+  const id = checkbox.dataset.id;
+  const savedLayout = JSON.parse(localStorage.getItem('dashboardLayout') || JSON.stringify(DASHBOARD_WIDGETS));
+  const widget = savedLayout.find(w => w.id === id);
+  if (widget) widget.enabled = checkbox.checked;
+  localStorage.setItem('dashboardLayout', JSON.stringify(savedLayout));
+  renderDashboard();
+};
+
+window.resetDashboardLayout = function() {
+  if(!confirm('Reset dashboard to default layout?')) return;
+  localStorage.removeItem('dashboardLayout');
+  renderDashboard();
+  showToast('✓ Dashboard reset', 'success');
+};
+
+function setupDragDrop() {
+  const cards = document.querySelectorAll('.widget-card');
+  let draggedEl = null;
+  
+  cards.forEach(card => {
+    card.addEventListener('dragstart', (e) => { draggedEl = card; e.dataTransfer.effectAllowed = 'move'; });
+    card.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+    card.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (draggedEl && draggedEl !== card) {
+        const grid = document.getElementById('widgets-grid');
+        const allCards = Array.from(grid.children);
+        const dragIdx = allCards.indexOf(draggedEl);
+        const dropIdx = allCards.indexOf(card);
+        
+        if (dragIdx < dropIdx) card.parentNode.insertBefore(draggedEl, card.nextSibling);
+        else card.parentNode.insertBefore(draggedEl, card);
+        
+        saveDashboardOrder();
+      }
+    });
+  });
+}
+
+function saveDashboardOrder() {
+  const cards = document.querySelectorAll('.widget-card');
+  const order = Array.from(cards).map(c => c.dataset.widget);
+  const savedLayout = JSON.parse(localStorage.getItem('dashboardLayout') || JSON.stringify(DASHBOARD_WIDGETS));
+  const newOrder = [];
+  order.forEach(id => {
+    const w = savedLayout.find(x => x.id === id);
+    if (w) newOrder.push(w);
+  });
+  savedLayout.forEach(w => {
+    if (!newOrder.find(x => x.id === w.id)) newOrder.push(w);
+  });
+  localStorage.setItem('dashboardLayout', JSON.stringify(newOrder));
+}
+
+window.showShiftSummary = function(summary) {
+  const hours = Math.floor(summary.duration / 60);
+  const mins = summary.duration % 60;
+  
+  const stats = [
+    {label: '📞 Calls', value: summary.callsCount},
+    {label: '👥 Contacts', value: summary.contactsCount},
+    {label: '💬 Interested', value: summary.interestedCount},
+    {label: '📅 Demos', value: summary.demosCount}
+  ];
+  
+  document.getElementById('summary-stats').innerHTML = stats.map(s =>
+    '<div style="background:var(--bg-secondary);padding:12px;border-radius:var(--radius);text-align:center;">' +
+      '<div style="font-size:14px;font-weight:700;color:var(--accent);">' + s.value + '</div>' +
+      '<div style="font-size:12px;color:var(--text-muted);margin-top:4px;">' + s.label + '</div>' +
+    '</div>'
+  ).join('');
+  
+  document.getElementById('summary-duration').textContent = hours + 'h ' + mins + 'm';
+  document.getElementById('summary-leads').textContent = summary.totalLeadsAssigned;
+  
+  document.getElementById('shift-summary-modal').style.display = 'flex';
+};
+
+window.closeShiftSummary = function() {
+  document.getElementById('shift-summary-modal').style.display = 'none';
+};
+
+window.startNewShift = function() {
+  closeShiftSummary();
+  document.getElementById('shift-modal').style.display = 'flex';
+};
+
+window.loadAdminShiftHistory = async function() {
+  if (userRole !== 'admin') return;
+  
+  try {
+    const q = query(collection(db, 'shiftSummaries'), orderBy('createdAt', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    const shifts = snap.docs.map(d => d.data());
+    
+    const html = shifts.map(shift => {
+      const startTime = new Date(shift.startTime);
+      const endTime = new Date(shift.endTime);
+      const hours = Math.floor(shift.duration / 60);
+      const mins = shift.duration % 60;
+      const date = startTime.toLocaleDateString();
+      const startHour = startTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      const endHour = endTime.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      
+      return '<div style="background:var(--bg-secondary);padding:14px;border-radius:var(--radius);border-left:3px solid var(--accent);">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">' +
+          '<div>' +
+            '<div style="font-weight:600;font-size:13px;color:var(--text);">' + esc(shift.userName) + '</div>' +
+            '<div style="font-size:11px;color:var(--text-muted);margin-top:2px;">' + date + ' · ' + startHour + ' - ' + endHour + '</div>' +
+          '</div>' +
+          '<div style="text-align:right;">' +
+            '<div style="font-weight:700;font-size:14px;color:var(--accent);">' + hours + 'h ' + mins + 'm</div>' +
+          '</div>' +
+        '</div>' +
+        '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;">' +
+          '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:4px;"><div style="font-weight:700;font-size:12px;color:var(--text);">' + shift.callsCount + '</div><div style="font-size:10px;color:var(--text-muted);">Calls</div></div>' +
+          '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:4px;"><div style="font-weight:700;font-size:12px;color:var(--text);">' + shift.contactsCount + '</div><div style="font-size:10px;color:var(--text-muted);">Contacts</div></div>' +
+          '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:4px;"><div style="font-weight:700;font-size:12px;color:#16a34a;">' + shift.interestedCount + '</div><div style="font-size:10px;color:var(--text-muted);">Interested</div></div>' +
+          '<div style="text-align:center;padding:6px;background:var(--bg);border-radius:4px;"><div style="font-weight:700;font-size:12px;color:#d97706;">' + shift.demosCount + '</div><div style="font-size:10px;color:var(--text-muted);">Demos</div></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+    
+    document.getElementById('shifts-list').innerHTML = html || '<div style="padding:20px;text-align:center;color:var(--text-hint);">No shifts recorded yet.</div>';
+  } catch (e) { console.error('Error loading shifts:', e); }
+};
+
+window.openAdminShifts = function() {
+  loadAdminShiftHistory();
+  document.getElementById('admin-shifts-modal').style.display = 'flex';
+};
+
+window.closeAdminShifts = function() {
+  document.getElementById('admin-shifts-modal').style.display = 'none';
+};
+
+window.filterShiftsByPeriod = function(period) {
+  // Update button states
+  document.querySelectorAll('[data-period]').forEach(btn => {
+    btn.classList.remove('btn-accent');
+    btn.classList.add('btn');
+  });
+  document.querySelector('[data-period="' + period + '"]').classList.add('btn-accent');
+  
+  // Filter and reload - for now just reload all
+  loadAdminShiftHistory();
+};
+
+window.loadShiftHistoryPreview = async function() {
+  if (userRole !== 'admin') return;
+  
+  try {
+    const q = query(collection(db, 'shiftSummaries'), orderBy('createdAt', 'desc'), limit(6));
+    const snap = await getDocs(q);
+    const shifts = snap.docs.map(d => d.data());
+    
+    const html = shifts.map(shift => {
+      const hours = Math.floor(shift.duration / 60);
+      const mins = shift.duration % 60;
+      const date = new Date(shift.startTime).toLocaleDateString();
+      const startHour = new Date(shift.startTime).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+      
+      return '<div style="background:var(--bg);border:1px solid var(--border);padding:12px;border-radius:var(--radius);border-left:3px solid var(--accent);">' +
+        '<div style="font-weight:600;font-size:12px;color:var(--text);margin-bottom:6px;">' + esc(shift.userName) + '</div>' +
+        '<div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;">' + date + ' at ' + startHour + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+          '<div style="text-align:center;padding:6px;background:var(--bg-secondary);border-radius:4px;"><div style="font-weight:700;font-size:12px;">' + shift.callsCount + ' calls</div></div>' +
+          '<div style="text-align:center;padding:6px;background:var(--bg-secondary);border-radius:4px;"><div style="font-weight:700;font-size:12px;">' + shift.interestedCount + ' interested</div></div>' +
+        '</div>' +
+        '<div style="margin-top:6px;font-size:11px;color:var(--text-muted);">Duration: ' + hours + 'h ' + mins + 'm</div>' +
+      '</div>';
+    }).join('');
+    
+    document.getElementById('shift-history-preview').innerHTML = html || '<div style="padding:20px;text-align:center;color:var(--text-hint);">No shift data yet.</div>';
+  } catch (e) { console.error('Error loading shift preview:', e); }
+};
+
+window.refreshShiftHistory = function() {
+  loadAdminShiftHistory();
+};
 </script>
 
 <!-- ── Footer ── -->
@@ -3095,6 +3208,83 @@ window.updateNote = window.updateNote;
   </div>
   <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-hint);">© 2025 Partechnologys · All rights reserved</div>
 </footer>
+
+<!-- ── Start Shift Modal ── -->
+<div id="shift-modal" class="modal-overlay" style="display:none;justify-content:center;align-items:center;" onclick="if(event.target===this)closeShiftModal()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;max-width:380px;box-shadow:var(--shadow-lg);text-align:center;">
+    <div style="font-size:48px;margin-bottom:16px;">🕐</div>
+    <h2 style="font-size:22px;font-weight:700;margin-bottom:8px;color:var(--text);">Start Your Shift</h2>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.5;">Click below to begin your shift and access your leads. Your shift time will be tracked.</p>
+    <div id="shift-time-display" style="font-size:13px;color:var(--text-muted);margin-bottom:16px;padding:10px;background:var(--bg-secondary);border-radius:var(--radius);">Ready to start</div>
+    <div style="display:flex;gap:10px;">
+      <button class="btn" onclick="closeShiftModal()" style="flex:1;">Not Now</button>
+      <button class="btn btn-accent" onclick="startShift()" style="flex:1;">Start Shift</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Shift Summary Modal ── -->
+<div id="shift-summary-modal" class="modal-overlay" style="display:none;justify-content:center;align-items:center;" onclick="if(event.target===this)closeShiftSummary()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;max-width:420px;box-shadow:var(--shadow-lg);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:48px;margin-bottom:12px;">✓</div>
+      <h2 style="font-size:20px;font-weight:700;margin:0 0 8px;color:var(--text);">Shift Complete</h2>
+      <p style="font-size:13px;color:var(--text-muted);margin:0;">Here's your shift summary</p>
+    </div>
+    
+    <div id="summary-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">
+      <!-- Stats will be populated here -->
+    </div>
+    
+    <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
+      <p style="font-size:12px;color:var(--text-muted);margin:0 0 8px;"><strong>Duration:</strong> <span id="summary-duration">0h 0m</span></p>
+      <p style="font-size:12px;color:var(--text-muted);margin:0;"><strong>Leads Assigned:</strong> <span id="summary-leads">0</span></p>
+    </div>
+    
+    <button class="btn btn-accent" onclick="closeShiftSummary()" style="width:100%;">Done</button>
+  </div>
+</div>
+
+<!-- ── Admin Shift Dashboard (modal) ── -->
+<div id="admin-shifts-modal" class="modal-overlay" style="display:none;justify-content:center;align-items:flex-start;padding-top:40px;" onclick="if(event.target===this)closeAdminShifts()">
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;max-width:700px;box-shadow:var(--shadow-lg);max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-size:18px;font-weight:700;color:var(--text);">📊 Agent Shift Reports</h2>
+      <button class="btn-icon" onclick="closeAdminShifts()" style="font-size:18px;padding:0;">×</button>
+    </div>
+    
+    <div style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn" onclick="filterShiftsByPeriod('today')" data-period="today">Today</button>
+      <button class="btn" onclick="filterShiftsByPeriod('week')" data-period="week">This Week</button>
+      <button class="btn" onclick="filterShiftsByPeriod('month')" data-period="month">This Month</button>
+      <button class="btn" onclick="filterShiftsByPeriod('all')" data-period="all">All Time</button>
+    </div>
+    
+    <div id="shifts-list" style="display:flex;flex-direction:column;gap:12px;">
+      <!-- Shift summaries will be populated here -->
+    </div>
+  </div>
+</div>
+  <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;max-width:600px;box-shadow:var(--shadow-lg);max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h2 style="font-size:18px;font-weight:700;color:var(--text);">🎛️ Customize Your Dashboard</h2>
+      <button class="btn-icon" onclick="closeDashboardCustomizer()" style="font-size:18px;padding:0;">×</button>
+    </div>
+    
+    <div style="margin-bottom:16px;">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;">Drag widgets to reorder them. Uncheck to hide.</p>
+      
+      <div id="widget-list" style="display:flex;flex-direction:column;gap:8px;">
+        <!-- Widgets will be populated here -->
+      </div>
+    </div>
+    
+    <div style="border-top:1px solid var(--border);padding-top:16px;display:flex;gap:10px;">
+      <button class="btn" onclick="resetDashboardLayout()" style="flex:1;">Reset to Default</button>
+      <button class="btn btn-accent" onclick="closeDashboardCustomizer()" style="flex:1;">Done</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
